@@ -91,3 +91,98 @@ export interface EmployeeWithDepartments {
 }
 
 export const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB in bytes
+
+// ============ CLIENT FINANCIAL TYPES ============
+
+export interface ClientContact {
+  email?: string
+  phone?: string
+  address?: string
+}
+
+export interface ClientFull {
+  id: string
+  name: string
+  type: ClientType
+  contact: ClientContact
+  monthly_value: number // For retainership
+  project_value: number | null // For project basis
+  project_duration_months: number | null // For project basis
+  org_id: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ClientWithCalculations extends ClientFull {
+  effective_monthly_value: number // project_value / duration or monthly_value
+  software_cost: number // Apportioned software cost
+  overhead_cost: number // Apportioned overhead cost
+  net_value: number // effective_monthly_value - software_cost - overhead_cost
+  subscribed_software: Software[]
+}
+
+// ============ SOFTWARE TYPES ============
+
+export interface Software {
+  id: string
+  name: string
+  value_per_month: number
+  org_id: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SoftwareSubscription {
+  id: string
+  software_id: string
+  client_id: string
+  created_at: string
+}
+
+export interface SoftwareWithSubscribers extends Software {
+  subscribers: { id: string; name: string }[]
+  apportioned_cost: number // value_per_month / subscribers.length
+}
+
+// ============ OVERHEAD TYPES ============
+
+export type OverheadCategory = 'rent' | 'board_salary' | 'electricity' | 'maintenance' | 'others'
+
+export const OVERHEAD_CATEGORIES: { value: OverheadCategory; label: string }[] = [
+  { value: 'rent', label: 'Rent' },
+  { value: 'board_salary', label: 'Board Salary' },
+  { value: 'electricity', label: 'Electricity' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'others', label: 'Others' },
+]
+
+export interface Overhead {
+  id: string
+  category: OverheadCategory
+  value_per_month: number
+  org_id: string
+  created_at: string
+  updated_at: string
+}
+
+// ============ AUDIT LOG TYPES ============
+
+export type AuditAction = 'create' | 'update' | 'delete'
+export type AuditEntity = 'client' | 'software' | 'overhead' | 'subscription'
+
+export interface AuditLog {
+  id: string
+  entity_type: AuditEntity
+  entity_id: string
+  entity_name: string
+  action: AuditAction
+  old_value: Record<string, unknown> | null
+  new_value: Record<string, unknown> | null
+  changed_by: string
+  org_id: string
+  created_at: string
+}
+
+export interface AuditLogWithUser extends AuditLog {
+  user_email?: string
+}
