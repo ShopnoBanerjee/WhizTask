@@ -18,12 +18,17 @@ export async function proxy(request: NextRequest) {
       // Check if user is org verified
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role, is_org_verified')
+        .select('role, is_org_verified, has_completed_onboarding')
         .eq('id', user.id)
         .single()
 
       if (!profile?.is_org_verified) {
         return NextResponse.redirect(new URL('/auth/verify-org', request.url))
+      }
+
+      // Check if employee needs onboarding
+      if (profile.role === 'employee' && !profile.has_completed_onboarding) {
+        return NextResponse.redirect(new URL('/employee/onboarding', request.url))
       }
 
       // Redirect to appropriate dashboard
@@ -42,13 +47,46 @@ export async function proxy(request: NextRequest) {
     // Check if already verified
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role, is_org_verified')
+      .select('role, is_org_verified, has_completed_onboarding')
       .eq('id', user.id)
       .single()
 
     if (profile?.is_org_verified) {
+      // Check if employee needs onboarding
+      if (profile.role === 'employee' && !profile.has_completed_onboarding) {
+        return NextResponse.redirect(new URL('/employee/onboarding', request.url))
+      }
       const redirectUrl = profile.role === 'admin' ? '/admin' : '/employee'
       return NextResponse.redirect(new URL(redirectUrl, request.url))
+    }
+
+    return response
+  }
+
+  // Protect employee onboarding route
+  if (pathname === '/employee/onboarding') {
+    if (!user) {
+      return NextResponse.redirect(new URL('/auth/login', request.url))
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, is_org_verified, has_completed_onboarding')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.is_org_verified) {
+      return NextResponse.redirect(new URL('/auth/verify-org', request.url))
+    }
+
+    // Only employees can access onboarding
+    if (profile.role !== 'employee') {
+      return NextResponse.redirect(new URL('/admin', request.url))
+    }
+
+    // If already completed onboarding, redirect to employee dashboard
+    if (profile.has_completed_onboarding) {
+      return NextResponse.redirect(new URL('/employee', request.url))
     }
 
     return response
@@ -70,13 +108,18 @@ export async function proxy(request: NextRequest) {
   // Get user profile for role and org verification
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_org_verified')
+    .select('role, is_org_verified, has_completed_onboarding')
     .eq('id', user.id)
     .single()
 
   // If not org verified, redirect to verify-org page
   if (!profile?.is_org_verified) {
     return NextResponse.redirect(new URL('/auth/verify-org', request.url))
+  }
+
+  // Check if employee needs onboarding
+  if (profile.role === 'employee' && !profile.has_completed_onboarding) {
+    return NextResponse.redirect(new URL('/employee/onboarding', request.url))
   }
 
   // Role-based route protection
