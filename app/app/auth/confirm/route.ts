@@ -16,6 +16,31 @@ export async function GET(request: Request) {
     })
 
     if (!error) {
+      // Get the user after verification
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        // Create profile
+        const role = user.user_metadata?.role || 'employee'
+        const name = user.user_metadata?.name || null
+        const email = user.email || ''
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            role,
+            name,
+            email,
+            is_org_verified: false,
+            has_completed_onboarding: false,
+          })
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError)
+          return NextResponse.redirect(`${origin}/auth/error?message=Could not create profile`)
+        }
+      }
+
       return NextResponse.redirect(`${origin}${next}`)
     }
   }

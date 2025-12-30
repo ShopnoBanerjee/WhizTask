@@ -28,6 +28,7 @@ export async function signIn(formData: FormData) {
 export async function signUp(formData: FormData) {
   const supabase = await createClient()
 
+  const name = formData.get('name') as string
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const role = formData.get('role') as UserRole
@@ -37,6 +38,7 @@ export async function signUp(formData: FormData) {
     password,
     options: {
       data: {
+        name,
         role,
       },
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,

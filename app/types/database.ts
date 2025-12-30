@@ -39,6 +39,18 @@ export const TASK_STATUSES: { value: TaskStatus; label: string }[] = [
   { value: 'overdue', label: 'Overdue' },
 ]
 
+export interface Profile {
+  id: string
+  role: 'admin' | 'employee'
+  org_id: string | null
+  name: string | null
+  email: string
+  is_org_verified: boolean
+  has_completed_onboarding: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface Client {
   id: string
   name: string
@@ -86,6 +98,7 @@ export interface TaskWithRelations extends Task {
 
 export interface EmployeeWithDepartments {
   id: string
+  name: string | null
   email: string
   departments: Department[]
 }
