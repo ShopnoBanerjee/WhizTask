@@ -23,7 +23,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { format } from 'date-fns'
-import { CalendarIcon, Plus, Upload, X } from 'lucide-react'
+import { CalendarIcon, Plus, Upload, X, Loader2, ChevronDownIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createTask, getClients, getEmployeesByDepartment } from '@/lib/admin/actions'
 import { uploadTaskAttachment, validateFileSize, formatFileSize } from '@/lib/supabase/storage'
@@ -38,10 +38,12 @@ export function CreateTaskForm() {
   // Form state
   const [clients, setClients] = useState<Client[]>([])
   const [employees, setEmployees] = useState<EmployeeWithDepartments[]>([])
+  const [loadingEmployees, setLoadingEmployees] = useState(false)
   const [selectedClient, setSelectedClient] = useState<string>('')
   const [selectedDepartment, setSelectedDepartment] = useState<Department | ''>('')
   const [selectedEmployee, setSelectedEmployee] = useState<string>('')
-  const [deadline, setDeadline] = useState<Date>()
+  const [selectedDate, setSelectedDate] = useState<Date>()
+  const [selectedTime, setSelectedTime] = useState<string>('10:30')
   const [details, setDetails] = useState('')
   const [attachments, setAttachments] = useState<TaskAttachment[]>([])
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([])
@@ -56,6 +58,7 @@ export function CreateTaskForm() {
 
   useEffect(() => {
     if (selectedDepartment) {
+      console.log('Loading employees for department:', selectedDepartment)
       loadEmployees(selectedDepartment)
     }
   }, [selectedDepartment])
@@ -66,8 +69,15 @@ export function CreateTaskForm() {
   }
 
   async function loadEmployees(department: Department) {
-    const data = await getEmployeesByDepartment(department)
-    setEmployees(data)
+    console.log('Fetching employees for department:', department)
+    setLoadingEmployees(true)
+    try {
+      const data = await getEmployeesByDepartment(department)
+      console.log('Fetched employees:', data)
+      setEmployees(data)
+    } finally {
+      setLoadingEmployees(false)
+    }
   }
 
   function resetForm() {
@@ -75,7 +85,8 @@ export function CreateTaskForm() {
     setSelectedClient('')
     setSelectedDepartment('')
     setSelectedEmployee('')
-    setDeadline(undefined)
+    setSelectedDate(undefined)
+    setSelectedTime('10:30')
     setDetails('')
     setAttachments([])
     setUploadingFiles([])
@@ -105,7 +116,7 @@ export function CreateTaskForm() {
   }
 
   async function handleSubmit() {
-    if (!selectedClient || !selectedDepartment || !deadline) {
+    if (!selectedClient || !selectedDepartment || !selectedDate || !selectedTime) {
       setError('Please fill in all required fields')
       return
     }
@@ -114,6 +125,11 @@ export function CreateTaskForm() {
     setError(null)
 
     try {
+      // Combine date and time into a single Date object
+      const deadlineDate = new Date(selectedDate)
+      const [hours, minutes] = selectedTime.split(':').map(Number)
+      deadlineDate.setHours(hours, minutes, 0, 0)
+
       // Create a temporary task ID for file uploads
       const tempTaskId = crypto.randomUUID()
 
@@ -135,7 +151,7 @@ export function CreateTaskForm() {
       formData.set('client_id', selectedClient)
       formData.set('department', selectedDepartment)
       formData.set('assigned_to', selectedEmployee)
-      formData.set('deadline', deadline.toISOString())
+      formData.set('deadline', deadlineDate.toISOString())
       formData.set('details', details)
       formData.set('attachments', JSON.stringify(uploadedAttachments))
 
@@ -158,8 +174,8 @@ export function CreateTaskForm() {
     switch (step) {
       case 1: return !!selectedClient
       case 2: return !!selectedDepartment
-      case 3: return true // Employee is optional
-      case 4: return !!deadline
+      case 3: return !!selectedEmployee
+      case 4: return !!selectedDate && !!selectedTime
       default: return true
     }
   }
@@ -205,7 +221,7 @@ export function CreateTaskForm() {
           {step === 2 && (
             <div className="space-y-2">
               <Label>Select Department *</Label>
-              <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as Department)}>
+              <Select value={selectedDepartment} onValueChange={(v) => { console.log('Selected department:', v); setSelectedDepartment(v as Department); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a department" />
                 </SelectTrigger>
@@ -222,20 +238,21 @@ export function CreateTaskForm() {
 
           {step === 3 && (
             <div className="space-y-2">
-              <Label>Assign to Employee</Label>
-              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+              <Label>Assign to Employee *</Label>
+              <Select value={selectedEmployee} onValueChange={setSelectedEmployee} disabled={loadingEmployees}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose an employee (optional)" />
+                  <SelectValue placeholder={loadingEmployees ? "Loading employees..." : "Choose an employee"} />
+                  {loadingEmployees && <Loader2 className="ml-2 size-4 animate-spin" />}
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map((emp) => (
                     <SelectItem key={emp.id} value={emp.id}>
-                      {emp.email}
+                      {emp.name || emp.email}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {employees.length === 0 && (
+              {employees.length === 0 && !loadingEmployees && (
                 <p className="text-sm text-muted-foreground">
                   No employees in this department
                 </p>
@@ -246,28 +263,41 @@ export function CreateTaskForm() {
           {step === 4 && (
             <div className="space-y-2">
               <Label>Deadline *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      'w-full justify-start text-left font-normal',
-                      !deadline && 'text-muted-foreground'
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 size-4" />
-                    {deadline ? format(deadline, 'PPP') : 'Pick a date'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={deadline}
-                    onSelect={setDeadline}
-                    initialFocus
+              <div className="flex gap-4">
+                <div className="flex flex-col gap-3">
+                  <Label className="px-1">Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-32 justify-between font-normal"
+                      >
+                        {selectedDate ? format(selectedDate, 'dd/MM/yyyy') : "Select date"}
+                        <ChevronDownIcon />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
+                        captionLayout="dropdown"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <Label className="px-1">Time</Label>
+                  <Input
+                    type="time"
+                    value={selectedTime}
+                    onChange={(e) => setSelectedTime(e.target.value)}
+                    step="60"
+                    className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                   />
-                </PopoverContent>
-              </Popover>
+                  <p className="text-xs text-muted-foreground">24-hour format</p>
+                </div>
+              </div>
             </div>
           )}
 

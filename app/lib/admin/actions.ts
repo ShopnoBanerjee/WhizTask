@@ -78,7 +78,9 @@ export async function getEmployeesByDepartment(department: Department): Promise<
       department,
       profiles!inner (
         id,
-        org_id
+        org_id,
+        name,
+        email
       )
     `)
     .eq('department', department)
@@ -89,24 +91,31 @@ export async function getEmployeesByDepartment(department: Department): Promise<
     return []
   }
 
-  // Get unique employee IDs
-  const employeeIds = [...new Set(data?.map(d => d.employee_id) || [])]
+  // Group by employee_id to get unique employees with their departments
+  const employeesMap = new Map<string, { name: string | null; email: string; departments: Department[] }>()
 
-  // Get user emails from auth
-  const employees: EmployeeWithDepartments[] = []
-  
-  for (const empId of employeeIds) {
-    const { data: userData } = await supabase.auth.admin.getUserById(empId)
-    if (userData?.user) {
-      const empDepts = data?.filter(d => d.employee_id === empId).map(d => d.department) || []
-      employees.push({
-        id: empId,
-        email: userData.user.email || '',
-        departments: empDepts as Department[],
+  data?.forEach((item) => {
+    const empId = item.employee_id
+    const dept = item.department as Department
+    const profile = item.profiles
+
+    if (!employeesMap.has(empId)) {
+      employeesMap.set(empId, {
+        name: profile.name,
+        email: profile.email,
+        departments: [],
       })
     }
-  }
 
+    employeesMap.get(empId)!.departments.push(dept)
+  })
+
+  const employees: EmployeeWithDepartments[] = Array.from(employeesMap.entries()).map(([id, data]) => ({
+    id,
+    name: data.name,
+    email: data.email,
+    departments: data.departments,
+  }))
   return employees
 }
 
@@ -124,34 +133,28 @@ export async function getOrgEmployees(): Promise<EmployeeWithDepartments[]> {
 
   if (!profile?.org_id) return []
 
-  // Get all profiles in org
-  const { data: orgProfiles, error } = await supabase
+  // Get all employees with their departments
+  const { data, error } = await supabase
     .from('profiles')
-    .select('id')
+    .select(`
+      id,
+      name,
+      email,
+      employee_departments (
+        department
+      )
+    `)
     .eq('org_id', profile.org_id)
     .eq('role', 'employee')
 
-  if (error || !orgProfiles) return []
+  if (error || !data) return []
 
-  // Get departments for each employee
-  const employees: EmployeeWithDepartments[] = []
-
-  for (const p of orgProfiles) {
-    const { data: depts } = await supabase
-      .from('employee_departments')
-      .select('department')
-      .eq('employee_id', p.id)
-
-    const { data: userData } = await supabase.auth.admin.getUserById(p.id)
-    
-    if (userData?.user) {
-      employees.push({
-        id: p.id,
-        email: userData.user.email || '',
-        departments: depts?.map(d => d.department as Department) || [],
-      })
-    }
-  }
+  const employees: EmployeeWithDepartments[] = data.map((p) => ({
+    id: p.id,
+    name: p.name,
+    email: p.email,
+    departments: p.employee_departments?.map((d: any) => d.department as Department) || [],
+  }))
 
   return employees
 }
