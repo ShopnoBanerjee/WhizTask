@@ -19,6 +19,15 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Eye } from 'lucide-react'
 import type { AuditLogWithUser } from '@/types/database'
 
 interface AuditLogViewerProps {
@@ -39,6 +48,28 @@ const ACTIONS = [
   { value: 'delete', label: 'Deleted' },
 ]
 
+function ValueDisplay({ value }: { value: unknown }) {
+  if (value === null || value === undefined) return <span>-</span>
+  if (typeof value === 'object') {
+    return (
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-6 px-2">
+            <Eye className="h-3 w-3" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Value Details</DialogTitle>
+          </DialogHeader>
+          <pre className="text-sm whitespace-pre-wrap">{JSON.stringify(value, null, 2)}</pre>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+  return <span className="max-w-[150px] truncate block">{String(value)}</span>
+}
+
 export function AuditLogViewer({ logs }: AuditLogViewerProps) {
   const [entityFilter, setEntityFilter] = useState('all')
   const [actionFilter, setActionFilter] = useState('all')
@@ -56,12 +87,6 @@ export function AuditLogViewer({ logs }: AuditLogViewerProps) {
       dateStyle: 'medium',
       timeStyle: 'short',
     }).format(new Date(dateString))
-  }
-
-  function formatValue(value: unknown) {
-    if (value === null || value === undefined) return '-'
-    if (typeof value === 'object') return JSON.stringify(value)
-    return String(value)
   }
 
   function getActionBadge(action: string) {
@@ -174,11 +199,11 @@ export function AuditLogViewer({ logs }: AuditLogViewerProps) {
                   <TableCell>{getEntityBadge(log.entity_type)}</TableCell>
                   <TableCell className="font-medium">{log.entity_name}</TableCell>
                   <TableCell>{getActionBadge(log.action)}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
-                    {formatValue(log.old_value)}
+                  <TableCell className="text-sm text-muted-foreground">
+                    <ValueDisplay value={log.old_value} />
                   </TableCell>
-                  <TableCell className="text-sm max-w-[150px] truncate">
-                    {formatValue(log.new_value)}
+                  <TableCell className="text-sm pl-4">
+                    <ValueDisplay value={log.new_value} />
                   </TableCell>
                   <TableCell className="text-sm">
                     {log.user_email || 'System'}
