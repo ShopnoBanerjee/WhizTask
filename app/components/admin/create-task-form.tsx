@@ -26,7 +26,7 @@ import { format } from 'date-fns'
 import { CalendarIcon, Plus, Upload, X, Loader2, ChevronDownIcon } from 'lucide-react'
 import { createTask, getClients, getEmployeesByDepartment, getProfile } from '@/lib/admin/actions'
 import { uploadTaskAttachment, validateFileSize, formatFileSize } from '@/lib/supabase/storage'
-import { DEPARTMENTS, MAX_FILE_SIZE, type Client, type Department, type EmployeeWithDepartments, type TaskAttachment } from '@/types/database'
+import { DEPARTMENTS, MAX_FILE_SIZE, type Client, type Department, type EmployeeWithDepartments, type TaskAttachment, type Profile } from '@/types/database'
 import { useUser } from '@/hooks/use-user'
 
 export function CreateTaskForm() {
@@ -49,7 +49,7 @@ export function CreateTaskForm() {
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([])
 
   const { user } = useUser()
-  const [profile, setProfile] = useState(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -149,9 +149,14 @@ export function CreateTaskForm() {
       const uploadedAttachments: TaskAttachment[] = [...attachments]
       
       for (const file of uploadingFiles) {
+        if (!profile?.org_id) {
+          setError('Organization ID not found. Please try again.')
+          return
+        }
+        
         console.log('is profile present?', profile)
         const result = await uploadTaskAttachment(
-          profile?.org_id , // Use actual org_id from user profile
+          profile.org_id,
           tempTaskId,
           file
         )
