@@ -1,80 +1,37 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client' // should return a browser client (anon key)
 import type { User } from '@supabase/supabase-js'
-import type { Profile } from '@/types/auth'
 
 interface UseUserReturn {
   user: User | null
-  profile: Profile | null
   isLoading: boolean
   error: Error | null
 }
 
 export function useUser(): UseUserReturn {
   const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
-
-    async function getUser() {
-      try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
-
-        if (userError) {
-          throw userError
-        }
-
-        setUser(user)
-
-        if (user) {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single()
-
-          if (profileError) {
-            throw profileError
-          }
-
-          setProfile(profile)
-        }
-      } catch (err) {
-        setError(err as Error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    getUser()
+    let mounted = true
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null)
-
-        if (session?.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-
-          setProfile(profile)
-        } else {
-          setProfile(null)
-        }
+      async (_event, session) => {
+        const newUser = session?.user ?? null
+        if (!mounted) return
+        setUser(newUser)
       }
     )
 
     return () => {
-      subscription.unsubscribe()
+      mounted = false
+      subscription?.unsubscribe()
     }
   }, [])
 
-  return { user, profile, isLoading, error }
+  return { user, isLoading, error }
 }

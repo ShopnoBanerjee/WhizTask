@@ -291,3 +291,21 @@ export async function deleteTask(taskId: string) {
   revalidatePath('/admin/tasks')
   return { success: true }
 }
+
+// ============ PROFILE ============
+
+export async function getProfile(userId: string) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single()
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return { profile: data }
+}

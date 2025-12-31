@@ -24,10 +24,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { format } from 'date-fns'
 import { CalendarIcon, Plus, Upload, X, Loader2, ChevronDownIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { createTask, getClients, getEmployeesByDepartment } from '@/lib/admin/actions'
+import { createTask, getClients, getEmployeesByDepartment, getProfile } from '@/lib/admin/actions'
 import { uploadTaskAttachment, validateFileSize, formatFileSize } from '@/lib/supabase/storage'
 import { DEPARTMENTS, MAX_FILE_SIZE, type Client, type Department, type EmployeeWithDepartments, type TaskAttachment } from '@/types/database'
+import { useUser } from '@/hooks/use-user'
 
 export function CreateTaskForm() {
   const [open, setOpen] = useState(false)
@@ -48,7 +48,22 @@ export function CreateTaskForm() {
   const [attachments, setAttachments] = useState<TaskAttachment[]>([])
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([])
 
+  const { user } = useUser()
+  const [profile, setProfile] = useState(null)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (user?.id) {
+      getProfile(user.id).then(result => {
+        if (result.error) {
+          console.error('Failed to get profile:', result.error)
+        } else {
+          setProfile(result.profile)
+        }
+      })
+    }
+  }, [user?.id])
 
   useEffect(() => {
     if (open) {
@@ -58,7 +73,6 @@ export function CreateTaskForm() {
 
   useEffect(() => {
     if (selectedDepartment) {
-      console.log('Loading employees for department:', selectedDepartment)
       loadEmployees(selectedDepartment)
     }
   }, [selectedDepartment])
@@ -69,11 +83,9 @@ export function CreateTaskForm() {
   }
 
   async function loadEmployees(department: Department) {
-    console.log('Fetching employees for department:', department)
     setLoadingEmployees(true)
     try {
       const data = await getEmployeesByDepartment(department)
-      console.log('Fetched employees:', data)
       setEmployees(data)
     } finally {
       setLoadingEmployees(false)
@@ -137,8 +149,9 @@ export function CreateTaskForm() {
       const uploadedAttachments: TaskAttachment[] = [...attachments]
       
       for (const file of uploadingFiles) {
+        console.log('is profile present?', profile)
         const result = await uploadTaskAttachment(
-          '', // org_id will be determined server-side
+          profile?.org_id , // Use actual org_id from user profile
           tempTaskId,
           file
         )
@@ -221,7 +234,7 @@ export function CreateTaskForm() {
           {step === 2 && (
             <div className="space-y-2">
               <Label>Select Department *</Label>
-              <Select value={selectedDepartment} onValueChange={(v) => { console.log('Selected department:', v); setSelectedDepartment(v as Department); }}>
+              <Select value={selectedDepartment} onValueChange={(v) => { setSelectedDepartment(v as Department); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a department" />
                 </SelectTrigger>
