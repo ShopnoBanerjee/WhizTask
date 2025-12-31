@@ -97,7 +97,9 @@ export async function getEmployeesByDepartment(department: Department): Promise<
   data?.forEach((item) => {
     const empId = item.employee_id
     const dept = item.department as Department
-    const profile = item.profiles
+    const profile = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles
+
+    if (!profile) return
 
     if (!employeesMap.has(empId)) {
       employeesMap.set(empId, {
