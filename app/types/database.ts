@@ -96,6 +96,14 @@ export interface TaskWithRelations extends Task {
   }
 }
 
+export interface PaginatedTasks {
+  data: TaskWithRelations[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
 export interface EmployeeWithDepartments {
   id: string
   name: string | null

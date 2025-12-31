@@ -105,7 +105,7 @@ export function TaskList({ initialTasks }: TaskListProps) {
       <div className="flex flex-wrap gap-2">
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="w-[200px] justify-start">
+            <Button variant="outline" className="w-50 justify-start">
               <CalendarIcon className="mr-2 size-4" />
               {filterDate ? format(filterDate, 'PPP') : 'Pick a date'}
             </Button>
@@ -141,7 +141,7 @@ export function TaskList({ initialTasks }: TaskListProps) {
           value={filterStatus}
           onValueChange={(v) => setFilterStatus(v as TaskStatus | 'all')}
         >
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="w-37.5">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>

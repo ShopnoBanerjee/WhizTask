@@ -1,14 +1,14 @@
+import { HistoryTasks } from '@/components/admin/history-tasks'
+
 export default function HistoryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">History</h1>
-        <p className="text-muted-foreground">View completed and past tasks</p>
+        <h1 className="text-2xl font-bold">Task History</h1>
+        <p className="text-muted-foreground">View all task logs and history</p>
       </div>
 
-      <div className="flex items-center justify-center py-12 text-muted-foreground">
-        History page coming soon
-      </div>
+      <HistoryTasks />
     </div>
   )
 }

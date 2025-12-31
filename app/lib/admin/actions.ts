@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import type { Client, Department, Task, TaskStatus, TaskWithRelations, EmployeeWithDepartments } from '@/types/database'
+import type { Client, Department, Task, TaskStatus, TaskWithRelations, EmployeeWithDepartments, PaginatedTasks } from '@/types/database'
 
 // ============ CLIENTS ============
 
@@ -290,6 +290,69 @@ export async function deleteTask(taskId: string) {
 
   revalidatePath('/admin/tasks')
   return { success: true }
+}
+
+export async function getHistoryTasks(filters?: {
+  page?: number
+  limit?: number
+  startDate?: string
+  endDate?: string
+  clientId?: string
+  assignedTo?: string
+}): Promise<PaginatedTasks> {
+  const supabase = await createClient()
+
+  const page = filters?.page || 1
+  const limit = filters?.limit || 10
+  const offset = (page - 1) * limit
+
+  let query = supabase
+    .from('tasks')
+    .select(`
+      *,
+      client:clients(*),
+      assigned_employee:profiles!tasks_assigned_to_fkey(id, email)
+    `, { count: 'exact' })
+    .order('updated_at', { ascending: false })
+
+  if (filters?.startDate && filters?.endDate) {
+    query = query
+      .gte('updated_at', filters.startDate)
+      .lte('updated_at', filters.endDate)
+  }
+
+  if (filters?.clientId) {
+    query = query.eq('client_id', filters.clientId)
+  }
+
+  if (filters?.assignedTo) {
+    query = query.eq('assigned_to', filters.assignedTo)
+  }
+
+  const { data, error, count } = await query
+    .range(offset, offset + limit - 1)
+
+  if (error) {
+    console.error('Error fetching history tasks:', error)
+    return {
+      data: [],
+      total: 0,
+      page,
+      limit,
+      totalPages: 0
+    }
+  }
+
+  const total = count || 0
+  const totalPages = Math.ceil(total / limit)
+
+  return {
+    data: data || [],
+    total,
+    page,
+    limit,
+    totalPages
+  }
 }
 
 // ============ PROFILE ============
