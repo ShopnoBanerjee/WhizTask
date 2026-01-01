@@ -45,6 +45,7 @@ export interface Profile {
   org_id: string | null
   name: string | null
   email: string
+  ctc_per_month: number | null // Cost to Company per month in INR
   is_org_verified: boolean
   has_completed_onboarding: boolean
   created_at: string
@@ -262,3 +263,79 @@ export const TASK_COLORS = [
   '#f97316', // orange
   '#6366f1', // indigo
 ] as const
+
+// ============ ANALYTICS TYPES ============
+
+export const WORKING_DAYS_PER_MONTH = 22
+export const WORKING_HOURS_PER_DAY = 8
+
+export interface EmployeeHourlyRate {
+  id: string
+  name: string | null
+  email: string
+  ctcPerMonth: number
+  hourlyRate: number // ctc / (22 * 8)
+  departments: Department[]
+}
+
+export interface ClientManHours {
+  clientId: string
+  clientName: string
+  clientType: ClientType
+  totalMinutes: number
+  totalHours: number
+  employeeBreakdown: {
+    employeeId: string
+    employeeName: string | null
+    minutes: number
+  }[]
+}
+
+export interface ClientProfitability {
+  clientId: string
+  clientName: string
+  clientType: ClientType
+  // Revenue
+  monthlyRevenue: number
+  totalRevenue: number // For project: project_value, for retainership: monthly * months in range
+  // Costs
+  laborCost: number // sum of (hours * employee hourly rate)
+  softwareCost: number
+  overheadCost: number
+  totalCost: number
+  // Profit
+  grossProfit: number // revenue - total cost
+  profitMargin: number // (gross profit / revenue) * 100
+  // Hours
+  totalHours: number
+  effectiveHourlyRevenue: number // revenue / hours
+}
+
+export interface EmployeePerformance {
+  employeeId: string
+  employeeName: string | null
+  email: string
+  departments: Department[]
+  // Task metrics
+  tasksAssigned: number
+  tasksCompleted: number
+  tasksOnTime: number // completed before deadline
+  completionRate: number // (completed / assigned) * 100
+  onTimeRate: number // (onTime / completed) * 100
+  // Time metrics
+  totalHoursLogged: number
+  avgHoursPerTask: number
+  // Productivity
+  hourlyRate: number
+  valueGenerated: number // hours * hourly rate
+}
+
+export interface AnalyticsSummary {
+  totalHoursLogged: number
+  totalEmployees: number
+  avgHourlyRate: number
+  totalRevenue: number
+  totalCost: number
+  netProfit: number
+  profitMargin: number
+}
