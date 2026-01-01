@@ -207,3 +207,58 @@ export interface AuditLog {
 export interface AuditLogWithUser extends AuditLog {
   user_email?: string
 }
+
+// ============ TIME LOG TYPES ============
+
+export interface TimeLog {
+  id: string
+  employee_id: string
+  task_id: string
+  log_date: string // YYYY-MM-DD format
+  start_time: number // minutes from midnight (0-1440)
+  end_time: number // minutes from midnight (0-1440)
+  duration: number // in minutes
+  org_id: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TimeLogWithTask extends TimeLog {
+  task: TaskWithRelations
+}
+
+export interface TimeBlock {
+  id: string
+  taskId: string
+  taskName: string
+  clientName: string
+  startTime: number // minutes from midnight
+  endTime: number // minutes from midnight
+  color: string
+}
+
+export interface DailyTimeStats {
+  totalLogged: number // minutes
+  remaining: number // minutes (1440 - totalLogged)
+  taskBreakdown: {
+    taskId: string
+    taskName: string
+    clientName: string
+    totalMinutes: number
+    color: string
+  }[]
+}
+
+// Task colors for timeline blocks
+export const TASK_COLORS = [
+  '#3b82f6', // blue
+  '#10b981', // emerald
+  '#f59e0b', // amber
+  '#ef4444', // red
+  '#8b5cf6', // violet
+  '#ec4899', // pink
+  '#06b6d4', // cyan
+  '#84cc16', // lime
+  '#f97316', // orange
+  '#6366f1', // indigo
+] as const
