@@ -8,7 +8,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react'
 import { TimeLogger } from './time-logger'
 import { TaskPanel } from './task-panel'
-import { TimeStats } from './time-stats'
 import { TimeEntryForm } from './time-entry-form'
 import { getTimeLogs } from '@/lib/employee/actions'
 import type { TaskWithRelations, TimeLogWithTask, TimeBlock } from '@/types/database'
@@ -132,9 +131,6 @@ export function TimeLoggerWrapper({ tasks, initialLogs, initialDate }: TimeLogge
         onBlocksChange={setBlocks}
         draggingTaskId={selectedTaskId}
       />
-
-      {/* Summary at bottom */}
-      <TimeStats blocks={blocks} />
     </div>
   )
 }
