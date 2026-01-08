@@ -62,7 +62,7 @@ export function TaskPanel({ tasks, selectedTaskId, onTaskSelect }: TaskPanelProp
 
   return (
     <Card>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 ">
         <CardTitle className="text-base flex items-center gap-2">
           Tasks
           <Badge variant="secondary" className="text-xs">{tasks.length}</Badge>

@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { X, ZoomIn, ZoomOut, Loader2, Check } from 'lucide-react'
+import { X, Loader2, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { TimeBlock, TaskWithRelations, TimeLogWithTask } from '@/types/database'
 import { createTimeLog, updateTimeLog, deleteTimeLog } from '@/lib/employee/actions'
@@ -15,13 +15,20 @@ const MIN_BLOCK_DURATION = 30 // minimum block duration in minutes
 const TIMELINE_HEIGHT = 60
 const SAVE_DEBOUNCE_MS = 800 // Wait 800ms after last change before saving
 
+// Timeline range: 10am to 10pm (10:00 - 22:00)
+const START_HOUR = 10
+const END_HOUR = 22
+const TOTAL_HOURS = END_HOUR - START_HOUR
+const START_MINUTES = START_HOUR * 60 // 600
+const END_MINUTES = END_HOUR * 60 // 1320
+
 const TASK_COLORS = [
   '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
   '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
 ]
 
-// Zoom levels: pixels per hour
-const ZOOM_LEVELS = [40, 60, 80, 100, 120]
+// Fixed hour width in pixels
+const HOUR_WIDTH =  95
 
 type SaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
 
@@ -58,11 +65,10 @@ function getTaskColor(taskId: string, taskColorMap: Map<string, string>): string
 }
 
 export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingTaskId }: TimeLoggerProps) {
-  const [zoomIndex, setZoomIndex] = useState(1) // Start at 60px per hour
-  const hourWidth = ZOOM_LEVELS[zoomIndex]
-  
-  const minutesToPosition = (minutes: number) => (minutes / 60) * hourWidth
-  const positionToMinutes = (position: number) => (position / hourWidth) * 60
+  // Convert minutes to pixel position (relative to START_MINUTES)
+  const minutesToPosition = (minutes: number) => ((minutes - START_MINUTES) / 60) * HOUR_WIDTH
+  // Convert pixel position to minutes (relative to START_MINUTES)
+  const positionToMinutes = (position: number) => (position / HOUR_WIDTH) * 60 + START_MINUTES
 
   const [blocks, setBlocks] = useState<TimeBlock[]>(() => {
     const colorMap = new Map<string, string>()
@@ -214,9 +220,9 @@ export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingT
       newEnd = snapToInterval(dragState.originalEnd + deltaMinutes)
     }
 
-    // Clamp to valid range
-    newStart = Math.max(0, Math.min(newStart, 1440 - MIN_BLOCK_DURATION))
-    newEnd = Math.max(newStart + MIN_BLOCK_DURATION, Math.min(newEnd, 1440))
+    // Clamp to valid range (10am - 10pm)
+    newStart = Math.max(START_MINUTES, Math.min(newStart, END_MINUTES - MIN_BLOCK_DURATION))
+    newEnd = Math.max(newStart + MIN_BLOCK_DURATION, Math.min(newEnd, END_MINUTES))
 
     const hasOverlap = checkOverlap(newStart, newEnd, dragState.blockId)
 
@@ -293,8 +299,8 @@ export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingT
     const x = e.clientX - rect.left + scrollLeft
     const minutes = snapToInterval(positionToMinutes(x))
 
-    const startTime = Math.max(0, Math.min(minutes - 30, 1440 - 60))
-    const endTime = Math.min(startTime + 60, 1440)
+    const startTime = Math.max(START_MINUTES, Math.min(minutes - 30, END_MINUTES - 60))
+    const endTime = Math.min(startTime + 60, END_MINUTES)
     const isValid = !checkOverlap(startTime, endTime)
 
     setDropPreview({ startTime, endTime, isValid })
@@ -365,17 +371,9 @@ export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingT
     }
   }
 
-  const handleZoomIn = () => {
-    setZoomIndex(prev => Math.min(prev + 1, ZOOM_LEVELS.length - 1))
-  }
-
-  const handleZoomOut = () => {
-    setZoomIndex(prev => Math.max(prev - 1, 0))
-  }
-
-  // Generate hour markers (show every 2 hours at lower zoom)
-  const hourStep = hourWidth < 60 ? 2 : 1
-  const hours = Array.from({ length: Math.floor(24 / hourStep) + 1 }, (_, i) => i * hourStep)
+  // Generate hour markers (10am to 10pm)
+  const hourStep = 1
+  const hours = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => START_HOUR + i)
 
   const renderSaveStatus = () => {
     switch (saveStatus) {
@@ -403,7 +401,7 @@ export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingT
   }
 
   return (
-    <Card>
+    <Card className='max-w-full'>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
@@ -412,26 +410,18 @@ export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingT
             </CardTitle>
             {renderSaveStatus()}
           </div>
-          <div className="flex items-center gap-1">
-            {error && (
-              <span className="text-sm text-destructive mr-2">{error}</span>
-            )}
-            <Button variant="ghost" size="icon" onClick={handleZoomOut} disabled={zoomIndex === 0}>
-              <ZoomOut className="size-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handleZoomIn} disabled={zoomIndex === ZOOM_LEVELS.length - 1}>
-              <ZoomIn className="size-4" />
-            </Button>
-          </div>
+          {error && (
+            <span className="text-sm text-destructive">{error}</span>
+          )}
         </div>
         {draggingTaskId && (
           <p className="text-xs text-muted-foreground">Click on the timeline to place the task</p>
         )}
       </CardHeader>
-      <CardContent className="p-2">
+      <CardContent className="overflow-hidden">
         <div 
           ref={scrollContainerRef}
-          className="overflow-x-auto pb-2"
+          className="overflow-x-auto pb-2 flex justify-center"
         >
           <div 
             ref={timelineRef}
@@ -439,7 +429,7 @@ export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingT
               "relative select-none",
               draggingTaskId && "cursor-crosshair"
             )}
-            style={{ width: 24 * hourWidth, height: TIMELINE_HEIGHT + 24, minWidth: '100%' }}
+            style={{ width: TOTAL_HOURS * HOUR_WIDTH, height: TIMELINE_HEIGHT + 24 }}
             onMouseMove={handleTimelineMouseMove}
             onMouseLeave={handleTimelineMouseLeave}
             onClick={handleTimelineClick}
@@ -452,7 +442,7 @@ export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingT
                   className="text-xs text-muted-foreground"
                   style={{ 
                     position: 'absolute',
-                    left: hour * hourWidth,
+                    left: (hour - START_HOUR) * HOUR_WIDTH,
                     transform: 'translateX(-50%)'
                   }}
                 >
@@ -471,16 +461,16 @@ export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingT
                 <div
                   key={hour}
                   className="absolute top-0 bottom-0 border-l border-border/40"
-                  style={{ left: hour * hourWidth }}
+                  style={{ left: (hour - START_HOUR) * HOUR_WIDTH }}
                 />
               ))}
               
               {/* Half-hour grid lines */}
-              {hourWidth >= 60 && Array.from({ length: 24 }, (_, i) => i).map(hour => (
+              {Array.from({ length: TOTAL_HOURS }, (_, i) => i).map(hour => (
                 <div
                   key={`half-${hour}`}
                   className="absolute top-0 bottom-0 border-l border-border/20"
-                  style={{ left: hour * hourWidth + hourWidth / 2 }}
+                  style={{ left: hour * HOUR_WIDTH + HOUR_WIDTH / 2 }}
                 />
               ))}
 
