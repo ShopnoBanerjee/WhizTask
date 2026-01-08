@@ -263,7 +263,7 @@ export function HistoryTasks({ initialData }: HistoryTasksProps) {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm">
-                    {task.assigned_employee?.email || 'Unassigned'}
+                    {task.assigned_employee?.name || task.assigned_employee?.email || 'Unassigned'}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
                     {task.details || 'No details'}

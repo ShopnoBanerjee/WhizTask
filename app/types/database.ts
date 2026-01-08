@@ -94,6 +94,7 @@ export interface TaskWithRelations extends Task {
   assigned_employee?: {
     id: string
     email: string
+    name: string
   }
 }
 
