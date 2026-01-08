@@ -72,7 +72,7 @@ export function TaskPanel({ tasks, selectedTaskId, onTaskSelect }: TaskPanelProp
         </p>
       </CardHeader>
       <CardContent className="p-0">
-        <ScrollArea className="h-48">
+        <ScrollArea className="h-36">
           <div className="space-y-1 p-3 pt-0">
             {tasks.map((task, index) => {
               const isOverdue = isPast(new Date(task.deadline)) && task.status !== 'completed'

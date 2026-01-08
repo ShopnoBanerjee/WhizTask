@@ -108,12 +108,20 @@ export function TimeLoggerWrapper({ tasks, initialLogs, initialDate }: TimeLogge
         </div>
       </div>
 
-      {/* Task selection row */}
-      <TaskPanel 
-        tasks={tasks} 
-        selectedTaskId={selectedTaskId}
-        onTaskSelect={setSelectedTaskId}
-      />
+      {/* Task selection and Quick Add row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:gap-6">
+        <TaskPanel
+          tasks={tasks}
+          selectedTaskId={selectedTaskId}
+          onTaskSelect={setSelectedTaskId}
+        />
+        <TimeEntryForm
+          date={dateString}
+          tasks={tasks}
+          blocks={blocks}
+          onEntryAdded={handleEntryAdded}
+        />
+      </div>
 
       {/* Timeline */}
       <TimeLogger
@@ -125,16 +133,8 @@ export function TimeLoggerWrapper({ tasks, initialLogs, initialDate }: TimeLogge
         draggingTaskId={selectedTaskId}
       />
 
-      {/* Form + Stats row */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <TimeEntryForm 
-          date={dateString}
-          tasks={tasks}
-          blocks={blocks}
-          onEntryAdded={handleEntryAdded}
-        />
-        <TimeStats blocks={blocks} />
-      </div>
+      {/* Summary at bottom */}
+      <TimeStats blocks={blocks} />
     </div>
   )
 }
