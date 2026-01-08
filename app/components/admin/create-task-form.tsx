@@ -26,10 +26,14 @@ import { format } from 'date-fns'
 import { CalendarIcon, Plus, Upload, X, Loader2, ChevronDownIcon } from 'lucide-react'
 import { createTask, getClients, getEmployeesByDepartment, getProfile } from '@/lib/admin/actions'
 import { uploadTaskAttachment, validateFileSize, formatFileSize } from '@/lib/supabase/storage'
-import { DEPARTMENTS, MAX_FILE_SIZE, type Client, type Department, type EmployeeWithDepartments, type TaskAttachment, type Profile } from '@/types/database'
+import { DEPARTMENTS, MAX_FILE_SIZE, type Client, type Department, type EmployeeWithDepartments, type TaskAttachment, type Profile, type TaskWithRelations } from '@/types/database'
 import { useUser } from '@/hooks/use-user'
 
-export function CreateTaskForm() {
+interface CreateTaskFormProps {
+  onTaskCreated?: (task: TaskWithRelations) => void
+}
+
+export function CreateTaskForm({ onTaskCreated }: CreateTaskFormProps) {
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -180,6 +184,9 @@ export function CreateTaskForm() {
       } else {
         setOpen(false)
         resetForm()
+        if (onTaskCreated && result.task) {
+          onTaskCreated(result.task)
+        }
       }
     } catch (err) {
       setError('Failed to create task')

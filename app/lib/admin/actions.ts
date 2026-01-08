@@ -194,7 +194,11 @@ export async function createTask(formData: FormData) {
     attachments,
     org_id: profile.org_id,
     created_by: user.id,
-  }).select().single()
+  }).select(`
+    *,
+    client:clients(*),
+    assigned_employee:profiles!tasks_assigned_to_fkey(id, email, name)
+  `).single()
 
   if (error) {
     return { error: error.message }
@@ -218,7 +222,8 @@ export async function getTasks(filters?: {
     .from('tasks')
     .select(`
       *,
-      client:clients(*)
+      client:clients(*),
+      assigned_employee:profiles!tasks_assigned_to_fkey(id, email, name)
     `)
     .order('deadline', { ascending: true })
 
@@ -313,7 +318,7 @@ export async function getHistoryTasks(filters?: {
     .select(`
       *,
       client:clients(*),
-      assigned_employee:profiles!tasks_assigned_to_fkey(id, email)
+      assigned_employee:profiles!tasks_assigned_to_fkey(id, email, name)
     `, { count: 'exact' })
     .order('updated_at', { ascending: false })
 
