@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format, isToday, isPast } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -26,42 +26,52 @@ import { cn } from '@/lib/utils'
 import { updateTaskStatus, deleteTask } from '@/lib/admin/actions'
 import {
   DEPARTMENTS,
-  TASK_STATUSES,
   type TaskWithRelations,
   type Department,
   type TaskStatus,
 } from '@/types/database'
 
 interface TaskListProps {
-  initialTasks: TaskWithRelations[]
+  tasks: TaskWithRelations[]
 }
 
-export function TaskList({ initialTasks }: TaskListProps) {
+export function TaskList({ tasks: initialTasks }: TaskListProps) {
   const [tasks, setTasks] = useState(initialTasks)
-  const [filterDate, setFilterDate] = useState<Date | undefined>(new Date())
+
+  useEffect(() => {
+    setTasks(initialTasks)
+  }, [initialTasks])
+  const [filterDate, setFilterDate] = useState<Date | undefined>(undefined)
   const [filterDepartment, setFilterDepartment] = useState<Department | 'all'>('all')
-  const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all')
 
   const filteredTasks = tasks.filter((task) => {
-    // Date filter
+    let dateMatch = true
+
     if (filterDate) {
+      // When date filter is set, show tasks for that specific date
       const taskDate = new Date(task.deadline)
-      if (
-        taskDate.getDate() !== filterDate.getDate() ||
-        taskDate.getMonth() !== filterDate.getMonth() ||
-        taskDate.getFullYear() !== filterDate.getFullYear()
-      ) {
-        return false
-      }
+      dateMatch = (
+        taskDate.getDate() === filterDate.getDate() &&
+        taskDate.getMonth() === filterDate.getMonth() &&
+        taskDate.getFullYear() === filterDate.getFullYear()
+      )
+    } else {
+      // Default view: today's tasks in any status + older tasks that are not completed
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const taskDate = new Date(task.deadline)
+      taskDate.setHours(0, 0, 0, 0)
+
+      const isToday = taskDate.getTime() === today.getTime()
+      const isOldAndNotCompleted = taskDate < today && task.status !== 'completed'
+
+      dateMatch = isToday || isOldAndNotCompleted
     }
+
+    if (!dateMatch) return false
 
     // Department filter
     if (filterDepartment !== 'all' && task.department !== filterDepartment) {
-      return false
-    }
-
-    // Status filter
-    if (filterStatus !== 'all' && task.status !== filterStatus) {
       return false
     }
 
@@ -107,7 +117,7 @@ export function TaskList({ initialTasks }: TaskListProps) {
           <PopoverTrigger asChild>
             <Button variant="outline" className="w-50 justify-start">
               <CalendarIcon className="mr-2 size-4" />
-              {filterDate ? format(filterDate, 'PPP') : 'Pick a date'}
+              {filterDate ? format(filterDate, 'PPP') : 'Filter by date'}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0">
@@ -124,7 +134,7 @@ export function TaskList({ initialTasks }: TaskListProps) {
           value={filterDepartment}
           onValueChange={(v) => setFilterDepartment(v as Department | 'all')}
         >
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-45">
             <SelectValue placeholder="Department" />
           </SelectTrigger>
           <SelectContent>
@@ -137,29 +147,11 @@ export function TaskList({ initialTasks }: TaskListProps) {
           </SelectContent>
         </Select>
 
-        <Select
-          value={filterStatus}
-          onValueChange={(v) => setFilterStatus(v as TaskStatus | 'all')}
-        >
-          <SelectTrigger className="w-37.5">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            {TASK_STATUSES.map((status) => (
-              <SelectItem key={status.value} value={status.value}>
-                {status.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
         <Button
           variant="ghost"
           onClick={() => {
-            setFilterDate(new Date())
+            setFilterDate(undefined)
             setFilterDepartment('all')
-            setFilterStatus('all')
           }}
         >
           Reset
@@ -244,7 +236,7 @@ export function TaskList({ initialTasks }: TaskListProps) {
 
                 {task.assigned_employee && (
                   <p className="text-xs text-muted-foreground">
-                    Assigned to: {task.assigned_employee.email}
+                    Assigned to: {task.assigned_employee.name || task.assigned_employee.email}
                   </p>
                 )}
               </CardContent>
