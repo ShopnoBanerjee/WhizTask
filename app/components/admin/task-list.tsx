@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { CalendarIcon, MoreVertical, Paperclip } from 'lucide-react'
+import { CalendarIcon, MoreVertical, Paperclip, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { updateTaskStatus, deleteTask } from '@/lib/admin/actions'
 import {
@@ -164,13 +164,13 @@ export function TaskList({ tasks: initialTasks }: TaskListProps) {
       </p>
 
       {/* Task grid */}
-      <ScrollArea className="h-[calc(100vh-300px)]">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <ScrollArea className="h-[calc(100vh-280px)]">
+        <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
           {filteredTasks.map((task) => (
-            <Card key={task.id} className="relative">
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-base">{task.client.name}</CardTitle>
+            <Card key={task.id}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{task.client.name}</CardTitle>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm">
@@ -198,47 +198,50 @@ export function TaskList({ tasks: initialTasks }: TaskListProps) {
                   </DropdownMenu>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">
-                    {getDepartmentLabel(task.department)}
-                  </Badge>
-                  <Badge className={cn('capitalize', getStatusColor(task.status))}>
-                    {task.status.replace('_', ' ')}
-                  </Badge>
-                </div>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Badge className={cn('capitalize', getStatusColor(task.status))}>
+                      {task.status.replace('_', ' ')}
+                    </Badge>
+                    <Badge variant="outline">
+                      {getDepartmentLabel(task.department)}
+                    </Badge>
+                  </div>
 
-                {task.details && (
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {task.details}
-                  </p>
-                )}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CalendarIcon className="size-4" />
+                    <span
+                      className={cn(
+                        isPast(new Date(task.deadline)) &&
+                          task.status !== 'completed' &&
+                          'text-red-600 font-medium'
+                      )}
+                    >
+                      {format(new Date(task.deadline), 'MMM d, yyyy')}
+                    </span>
+                  </div>
 
-                <div className="flex items-center justify-between text-sm">
-                  <span
-                    className={cn(
-                      'text-muted-foreground',
-                      isPast(new Date(task.deadline)) &&
-                        task.status !== 'completed' &&
-                        'text-red-600'
-                    )}
-                  >
-                    {format(new Date(task.deadline), 'MMM d, yyyy')}
-                  </span>
+                  {task.assigned_employee && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <User className="size-4" />
+                      <span>{task.assigned_employee.name || task.assigned_employee.email}</span>
+                    </div>
+                  )}
+
+                  {task.details && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {task.details}
+                    </p>
+                  )}
 
                   {task.attachments.length > 0 && (
-                    <span className="flex items-center gap-1 text-muted-foreground">
-                      <Paperclip className="size-3" />
-                      {task.attachments.length}
-                    </span>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Paperclip className="size-4" />
+                      <span>{task.attachments.length} attachment{task.attachments.length !== 1 ? 's' : ''}</span>
+                    </div>
                   )}
                 </div>
-
-                {task.assigned_employee && (
-                  <p className="text-xs text-muted-foreground">
-                    Assigned to: {task.assigned_employee.name || task.assigned_employee.email}
-                  </p>
-                )}
               </CardContent>
             </Card>
           ))}
