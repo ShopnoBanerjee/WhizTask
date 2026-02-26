@@ -1,7 +1,10 @@
 import { EmployeeTaskList } from '@/components/employee/employee-task-list'
 import { getEmployeeTasks } from '@/lib/employee/actions'
+import { createClient } from '@/lib/supabase/server'
 
 export default async function EmployeeTasksPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
   const tasks = await getEmployeeTasks()
 
   return (
@@ -11,7 +14,7 @@ export default async function EmployeeTasksPage() {
         <p className="text-muted-foreground">View and manage all your assigned tasks</p>
       </div>
 
-      <EmployeeTaskList initialTasks={tasks} />
+      <EmployeeTaskList initialTasks={tasks} currentUserId={user?.id || ''} />
     </div>
   )
 }

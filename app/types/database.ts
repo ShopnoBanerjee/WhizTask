@@ -41,7 +41,7 @@ export const TASK_STATUSES: { value: TaskStatus; label: string }[] = [
 
 export interface Profile {
   id: string
-  role: 'admin' | 'employee'
+  role: 'admin' | 'employee' | 'client_servicing'
   org_id: string | null
   name: string | null
   email: string
@@ -96,6 +96,49 @@ export interface TaskWithRelations extends Task {
     email: string
     name: string
   }
+  subtasks?: SubtaskWithRelations[]
+}
+
+// ============ SUBTASK TYPES ============
+
+export interface Subtask {
+  id: string
+  task_id: string
+  title: string
+  details: string | null
+  department: Department
+  assigned_to: string | null
+  deadline: string
+  status: TaskStatus
+  attachments: TaskAttachment[]
+  sort_order: number
+  org_id: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SubtaskWithRelations extends Subtask {
+  assigned_employee?: {
+    id: string
+    email: string
+    name: string
+  }
+}
+
+export interface TaskWithSubtasks extends TaskWithRelations {
+  subtasks: SubtaskWithRelations[]
+}
+
+// Form type for creating subtasks
+export interface SubtaskFormData {
+  title: string
+  details: string
+  department: Department | ''
+  assigned_to: string
+  deadline: Date | undefined
+  deadlineTime: string
+  attachments: TaskAttachment[]
+  uploadingFiles: File[]
 }
 
 export interface PaginatedTasks {
@@ -216,6 +259,7 @@ export interface TimeLog {
   id: string
   employee_id: string
   task_id: string
+  subtask_id: string | null
   log_date: string // YYYY-MM-DD format
   start_time: number // minutes from midnight (0-1440)
   end_time: number // minutes from midnight (0-1440)
@@ -227,12 +271,15 @@ export interface TimeLog {
 
 export interface TimeLogWithTask extends TimeLog {
   task: TaskWithRelations
+  subtask?: SubtaskWithRelations
 }
 
 export interface TimeBlock {
   id: string
   taskId: string
+  subtaskId: string | null
   taskName: string
+  subtaskTitle: string | null
   clientName: string
   startTime: number // minutes from midnight
   endTime: number // minutes from midnight
@@ -244,7 +291,9 @@ export interface DailyTimeStats {
   remaining: number // minutes (1440 - totalLogged)
   taskBreakdown: {
     taskId: string
+    subtaskId: string | null
     taskName: string
+    subtaskTitle: string | null
     clientName: string
     totalMinutes: number
     color: string

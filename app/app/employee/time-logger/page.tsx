@@ -5,12 +5,16 @@ import {
   getTimeLogs, 
   getEmployeeProfile
 } from '@/lib/employee/actions'
+import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
 export default async function TimeLoggerPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
   const profile = await getEmployeeProfile()
   
-  if (!profile) {
+  if (!profile || !user) {
     redirect('/auth/login')
   }
 
@@ -37,6 +41,7 @@ export default async function TimeLoggerPage() {
         tasks={activeTasks} 
         initialLogs={timeLogs}
         initialDate={today}
+        currentUserId={user.id}
       />
     </div>
   )

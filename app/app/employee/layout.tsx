@@ -1,5 +1,6 @@
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { EmployeeSidebar } from '@/components/employee/employee-sidebar'
+import SidebarVisibility from '@/components/employee-sidebar-switch'
+import RoleSidebar from '@/components/role-sidebar'
 import { Separator } from '@/components/ui/separator'
 
 export default function EmployeeLayout({
@@ -9,7 +10,10 @@ export default function EmployeeLayout({
 }) {
   return (
     <SidebarProvider>
-      <EmployeeSidebar />
+      {/* client wrapper controls visibility without pulling server deps into client bundle */}
+      <SidebarVisibility>
+        <RoleSidebar />
+      </SidebarVisibility>
       <SidebarInset>
         <header className="flex h-14 items-center gap-2 border-b px-4">
           <SidebarTrigger />

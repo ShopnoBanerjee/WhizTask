@@ -26,6 +26,7 @@ import {
 import { CalendarIcon, Loader2 } from 'lucide-react'
 import { getEmployeeTaskHistory } from '@/lib/employee/actions'
 import { DEPARTMENTS } from '@/types/database'
+import { getDepartmentColor } from '@/lib/taskColors'
 import type { TaskWithRelations } from '@/types/database'
 
 interface HistoryData {
@@ -147,7 +148,7 @@ export function EmployeeHistory() {
                       {task.client?.name || 'Unknown'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">
+                      <Badge className={getDepartmentColor(task.department)}>
                         {getDepartmentLabel(task.department)}
                       </Badge>
                     </TableCell>

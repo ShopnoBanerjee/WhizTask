@@ -29,9 +29,11 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination'
 import { format } from 'date-fns'
+import { cn } from '@/lib/utils'
 import type { PaginatedTasks, Client, EmployeeWithDepartments } from '@/types/database'
 import { getHistoryTasks, getClients, getOrgEmployees } from '@/lib/admin/actions'
 import { DEPARTMENTS } from '@/types/database'
+import { getStatusColor, getDepartmentColor } from '@/lib/taskColors'
 
 interface HistoryTasksProps {
   initialData?: PaginatedTasks
@@ -249,16 +251,12 @@ export function HistoryTasks({ initialData }: HistoryTasksProps) {
                     {task.client.name}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">
+                    <Badge className={getDepartmentColor(task.department)}>
                       {getDepartmentLabel(task.department)}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={
-                      task.status === 'completed' ? 'default' :
-                      task.status === 'in_progress' ? 'secondary' :
-                      task.status === 'overdue' ? 'destructive' : 'outline'
-                    }>
+                    <Badge className={cn('capitalize', getStatusColor(task.status))}>
                       {task.status.replace('_', ' ')}
                     </Badge>
                   </TableCell>
@@ -273,7 +271,7 @@ export function HistoryTasks({ initialData }: HistoryTasksProps) {
             )}
           </TableBody>
         </Table>
-      </div>
+      </div>  
 
       {data.totalPages > 1 && (
         <Pagination>

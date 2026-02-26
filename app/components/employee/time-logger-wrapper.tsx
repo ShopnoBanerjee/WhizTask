@@ -16,12 +16,14 @@ interface TimeLoggerWrapperProps {
   tasks: TaskWithRelations[]
   initialLogs: TimeLogWithTask[]
   initialDate: string
+  currentUserId: string
 }
 
-export function TimeLoggerWrapper({ tasks, initialLogs, initialDate }: TimeLoggerWrapperProps) {
+export function TimeLoggerWrapper({ tasks, initialLogs, initialDate, currentUserId }: TimeLoggerWrapperProps) {
   const [selectedDate, setSelectedDate] = useState(new Date(initialDate))
   const [blocks, setBlocks] = useState<TimeBlock[]>([])
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [selectedSubtaskId, setSelectedSubtaskId] = useState<string | null>(null)
   const [logs, setLogs] = useState<TimeLogWithTask[]>(initialLogs)
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -44,16 +46,24 @@ export function TimeLoggerWrapper({ tasks, initialLogs, initialDate }: TimeLogge
   const handlePrevDay = () => {
     setSelectedDate(prev => subDays(prev, 1))
     setSelectedTaskId(null)
+    setSelectedSubtaskId(null)
   }
 
   const handleNextDay = () => {
     setSelectedDate(prev => addDays(prev, 1))
     setSelectedTaskId(null)
+    setSelectedSubtaskId(null)
   }
 
   const handleToday = () => {
     setSelectedDate(new Date())
     setSelectedTaskId(null)
+    setSelectedSubtaskId(null)
+  }
+
+  const handleTaskSelect = (taskId: string | null, subtaskId?: string | null) => {
+    setSelectedTaskId(taskId)
+    setSelectedSubtaskId(subtaskId || null)
   }
 
   const handleEntryAdded = () => {
@@ -112,12 +122,15 @@ export function TimeLoggerWrapper({ tasks, initialLogs, initialDate }: TimeLogge
         <TaskPanel
           tasks={tasks}
           selectedTaskId={selectedTaskId}
-          onTaskSelect={setSelectedTaskId}
+          selectedSubtaskId={selectedSubtaskId}
+          currentUserId={currentUserId}
+          onTaskSelect={handleTaskSelect}
         />
         <TimeEntryForm
           date={dateString}
           tasks={tasks}
           blocks={blocks}
+          currentUserId={currentUserId}
           onEntryAdded={handleEntryAdded}
         />
       </div>
@@ -128,8 +141,10 @@ export function TimeLoggerWrapper({ tasks, initialLogs, initialDate }: TimeLogge
         date={dateString}
         tasks={tasks}
         initialLogs={logs}
+        currentUserId={currentUserId}
         onBlocksChange={setBlocks}
         draggingTaskId={selectedTaskId}
+        draggingSubtaskId={selectedSubtaskId}
       />
     </div>
   )

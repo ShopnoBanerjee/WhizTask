@@ -26,8 +26,8 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL('/auth/verify-org', request.url))
       }
 
-      // Check if employee needs onboarding
-      if (profile.role === 'employee' && !profile.has_completed_onboarding) {
+      // Check if employee needs onboarding (client_servicing treated as employee here)
+      if ((profile.role === 'employee' || profile.role === 'client_servicing') && !profile.has_completed_onboarding) {
         return NextResponse.redirect(new URL('/employee/onboarding', request.url))
       }
 
@@ -79,7 +79,7 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/verify-org', request.url))
     }
 
-    // Only employees can access onboarding
+    // Only true employees can access onboarding; client_servicing has already been onboarded
     if (profile.role !== 'employee') {
       return NextResponse.redirect(new URL('/admin', request.url))
     }
@@ -117,8 +117,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/verify-org', request.url))
   }
 
-  // Check if employee needs onboarding
-  if (profile.role === 'employee' && !profile.has_completed_onboarding) {
+  // Check if employee needs onboarding (treat client_servicing same as employee)
+  if ((profile.role === 'employee' || profile.role === 'client_servicing') && !profile.has_completed_onboarding) {
     return NextResponse.redirect(new URL('/employee/onboarding', request.url))
   }
 
@@ -126,13 +126,31 @@ export async function proxy(request: NextRequest) {
   const isAdminRoute = pathname.startsWith('/admin')
   const isEmployeeRoute = pathname.startsWith('/employee')
 
-  if (isAdminRoute && profile.role !== 'admin') {
-    return NextResponse.redirect(new URL('/employee', request.url))
+
+  if (isAdminRoute) {
+    if (profile.role === 'admin') {
+      // allowed
+    } else if (profile.role === 'client_servicing') {
+      // restrict to tasks/history only
+      if (
+        !pathname.startsWith('/admin/tasks') &&
+        !pathname.startsWith('/admin/history') &&
+        pathname !== '/admin'
+      ) {
+        console.log('redirect client_servicing from admin route', pathname)
+        return NextResponse.redirect(new URL('/admin/tasks', request.url))
+      }
+    } else {
+      return NextResponse.redirect(new URL('/employee', request.url))
+    }
   }
 
-  if (isEmployeeRoute && profile.role !== 'employee') {
+  if (isEmployeeRoute && profile.role === 'admin') {
+    // admins shouldn't hit employee routes
     return NextResponse.redirect(new URL('/admin', request.url))
   }
+
+  // allow employee and client_servicing on employee routes
 
   return response
 }
