@@ -103,6 +103,8 @@ export async function verifyOrgCode(formData: FormData) {
     .eq('id', user.id)
     .single()
 
+  console.log('verifyOrgCode role:', profile?.role)
+
   revalidatePath('/', 'layout')
   
   if (profile?.role === 'admin') {
@@ -117,11 +119,14 @@ export async function forgotPassword(formData: FormData) {
 
   const email = formData.get('email') as string
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/update-password`,
   })
 
+  console.log("RESET RESPONSE:", { data, error })
+
   if (error) {
+    console.error(error)
     redirect(`/auth/error?message=${encodeURIComponent(error.message)}`)
   }
 

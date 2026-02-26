@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client' // should return a browser client (anon key)
+import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
 interface UseUserReturn {
@@ -16,18 +16,48 @@ export function useUser(): UseUserReturn {
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
+    console.log('🔵 useUser mounted')
+
     const supabase = createClient()
     let mounted = true
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        const newUser = session?.user ?? null
-        if (!mounted) return
-        setUser(newUser)
+    async function getInitialSession() {
+      console.log('🟡 Fetching initial session...')
+
+      const { data, error } = await supabase.auth.getSession()
+
+      if (error) {
+        console.error('🔴 getSession error:', error)
+        if (mounted) {
+          setError(error)
+          setIsLoading(false)
+        }
+        return
       }
-    )
+
+      console.log('🟢 Initial session:', data.session)
+
+      if (mounted) {
+        setUser(data.session?.user ?? null)
+        setIsLoading(false)
+      }
+    }
+
+    getInitialSession()
+
+    const { data: { subscription } } =
+      supabase.auth.onAuthStateChange((event, session) => {
+        console.log('🟣 Auth state changed:', event)
+        console.log('🟣 New session:', session)
+
+        if (!mounted) return
+
+        setUser(session?.user ?? null)
+        setIsLoading(false)
+      })
 
     return () => {
+      console.log('⚪ useUser unmounted')
       mounted = false
       subscription?.unsubscribe()
     }
