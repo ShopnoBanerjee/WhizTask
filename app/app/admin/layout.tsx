@@ -1,5 +1,5 @@
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { AppSidebar } from '@/components/admin/app-sidebar'
+import RoleSidebar from '@/components/role-sidebar'
 import { Separator } from '@/components/ui/separator'
 
 export default function AdminLayout({
@@ -9,7 +9,7 @@ export default function AdminLayout({
 }) {
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <RoleSidebar />
       <SidebarInset>
         <header className="flex h-14 items-center gap-2 border-b px-4">
           <SidebarTrigger />
