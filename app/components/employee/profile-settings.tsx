@@ -166,7 +166,9 @@ export function ProfileSettings({ profile, departments }: ProfileSettingsProps) 
         <CardContent className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Role</span>
-            <Badge variant="outline" className="capitalize">{profile.role}</Badge>
+            <Badge variant="outline" className="capitalize">
+              {profile.role.replace('_', ' ')}
+            </Badge>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Member since</span>

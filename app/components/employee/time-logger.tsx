@@ -35,8 +35,10 @@ interface TimeLoggerProps {
   date: string
   tasks: TaskWithRelations[]
   initialLogs: TimeLogWithTask[]
+  currentUserId: string
   onBlocksChange?: (blocks: TimeBlock[]) => void
   draggingTaskId?: string | null
+  draggingSubtaskId?: string | null
 }
 
 function snapToInterval(minutes: number): number {
@@ -49,29 +51,35 @@ function formatTime(minutes: number): string {
   return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`
 }
 
-function getTaskColor(taskId: string, taskColorMap: Map<string, string>): string {
-  if (!taskColorMap.has(taskId)) {
+function getTaskColor(taskId: string, subtaskId: string | null, taskColorMap: Map<string, string>): string {
+  const key = subtaskId ? `${taskId}:${subtaskId}` : taskId
+  if (!taskColorMap.has(key)) {
     const colorIndex = taskColorMap.size % TASK_COLORS.length
-    taskColorMap.set(taskId, TASK_COLORS[colorIndex])
+    taskColorMap.set(key, TASK_COLORS[colorIndex])
   }
-  return taskColorMap.get(taskId)!
+  return taskColorMap.get(key)!
 }
 
-export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingTaskId }: TimeLoggerProps) {
+export function TimeLogger({ date, tasks, initialLogs, currentUserId, onBlocksChange, draggingTaskId, draggingSubtaskId }: TimeLoggerProps) {
   const minutesToPosition = (minutes: number) => (minutes / 60) * HOUR_WIDTH
   const positionToMinutes = (position: number) => (position / HOUR_WIDTH) * 60
 
   const [blocks, setBlocks] = useState<TimeBlock[]>(() => {
     const colorMap = new Map<string, string>()
-    return initialLogs.map(log => ({
-      id: log.id,
-      taskId: log.task_id,
-      taskName: log.task?.details?.substring(0, 30) || 'Task',
-      clientName: log.task?.client?.name || 'Client',
-      startTime: log.start_time,
-      endTime: log.end_time,
-      color: getTaskColor(log.task_id, colorMap),
-    }))
+    return initialLogs.map(log => {
+      const subtask = (log as any).subtask
+      return {
+        id: log.id,
+        taskId: log.task_id,
+        subtaskId: log.subtask_id || null,
+        taskName: subtask?.title || log.task?.details?.substring(0, 30) || 'Task',
+        subtaskTitle: subtask?.title || null,
+        clientName: log.task?.client?.name || 'Client',
+        startTime: log.start_time,
+        endTime: log.end_time,
+        color: getTaskColor(log.task_id, log.subtask_id || null, colorMap),
+      }
+    })
   })
   
   const [dragState, setDragState] = useState<{
@@ -100,8 +108,9 @@ export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingT
   // Initialize color map from existing blocks
   useEffect(() => {
     blocks.forEach(block => {
-      if (!taskColorMap.current.has(block.taskId)) {
-        taskColorMap.current.set(block.taskId, block.color)
+      const key = block.subtaskId ? `${block.taskId}:${block.subtaskId}` : block.taskId
+      if (!taskColorMap.current.has(key)) {
+        taskColorMap.current.set(key, block.color)
       }
     })
   }, [])
@@ -283,7 +292,7 @@ export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingT
 
   // Handle timeline click to show drop preview when dragging from task panel
   const handleTimelineMouseMove = (e: React.MouseEvent) => {
-    if (!draggingTaskId || !timelineRef.current) return
+    if ((!draggingTaskId && !draggingSubtaskId) || !timelineRef.current) return
 
     const rect = timelineRef.current.getBoundingClientRect()
     const scrollLeft = scrollContainerRef.current?.scrollLeft || 0
@@ -298,19 +307,33 @@ export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingT
   }
 
   const handleTimelineMouseLeave = () => {
-    if (draggingTaskId) {
+    if (draggingTaskId || draggingSubtaskId) {
       setDropPreview(null)
     }
   }
 
   const handleTimelineClick = async (e: React.MouseEvent) => {
-    if (!draggingTaskId || !dropPreview || !dropPreview.isValid) return
+    if ((!draggingTaskId && !draggingSubtaskId) || !dropPreview || !dropPreview.isValid) return
 
+    // Find task and optionally subtask info
+    let taskName = 'Task'
+    let clientName = 'Client'
+    
     const task = tasks.find(t => t.id === draggingTaskId)
-    if (!task) return
+    if (task) {
+      clientName = task.client?.name || 'Client'
+      
+      if (draggingSubtaskId && task.subtasks) {
+        const subtask = task.subtasks.find(s => s.id === draggingSubtaskId)
+        taskName = subtask?.title || task.details?.substring(0, 30) || 'Task'
+      } else {
+        taskName = task.details?.substring(0, 30) || 'Task'
+      }
+    }
 
     const result = await createTimeLog({
-      taskId: draggingTaskId,
+      taskId: draggingTaskId!,
+      subtaskId: draggingSubtaskId || null,
       logDate: date,
       startTime: dropPreview.startTime,
       endTime: dropPreview.endTime,
@@ -320,12 +343,22 @@ export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingT
       setError(result.error)
       setTimeout(() => setError(null), 2000)
     } else if (result.timeLog) {
-      const color = getTaskColor(draggingTaskId, taskColorMap.current)
+      const color = getTaskColor(draggingTaskId!, draggingSubtaskId || null, taskColorMap.current)
+      
+      // Get subtask title if present
+      let subtaskTitle: string | null = null
+      if (draggingSubtaskId && task?.subtasks) {
+        const subtask = task.subtasks.find(s => s.id === draggingSubtaskId)
+        subtaskTitle = subtask?.title || null
+      }
+      
       setBlocks(prev => [...prev, {
         id: result.timeLog.id,
-        taskId: draggingTaskId,
-        taskName: task.details?.substring(0, 30) || 'Task',
-        clientName: task.client?.name || 'Client',
+        taskId: draggingTaskId!,
+        subtaskId: draggingSubtaskId || null,
+        taskName,
+        subtaskTitle,
+        clientName,
         startTime: dropPreview.startTime,
         endTime: dropPreview.endTime,
         color,
@@ -552,6 +585,11 @@ export function TimeLogger({ date, tasks, initialLogs, onBlocksChange, draggingT
                         <div className="text-sm">
                           <div className="font-medium">{block.clientName}</div>
                           <div className="text-muted-foreground">{block.taskName}</div>
+                          {block.subtaskId && (
+                            <div className="text-xs text-muted-foreground/80">
+                              (Subtask)
+                            </div>
+                          )}
                           <div className="text-muted-foreground">
                             {formatTime(block.startTime)} - {formatTime(block.endTime)}
                           </div>
