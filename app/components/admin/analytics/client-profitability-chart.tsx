@@ -37,7 +37,7 @@ const formatCompact = (value: number) => {
 export function ClientProfitabilityChart({ data }: ClientProfitabilityChartProps) {
   const [view, setView] = useState<'profit' | 'breakdown'>('profit')
 
-  const chartData = data.slice(0, 10).map(client => ({
+  const chartData = data.map(client => ({
     name: client.clientName.length > 12 
       ? client.clientName.substring(0, 12) + '...' 
       : client.clientName,
@@ -106,8 +106,9 @@ export function ClientProfitabilityChart({ data }: ClientProfitabilityChartProps
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-72 w-full overflow-x-auto overflow-y-hidden">
+          <div style={{ minWidth: `max(100%, ${chartData.length * 80}px)`, height: '100%' }}>
+            <ResponsiveContainer width="100%" height="100%">
             {view === 'profit' ? (
               <BarChart
                 data={chartData}
@@ -179,14 +180,9 @@ export function ClientProfitabilityChart({ data }: ClientProfitabilityChartProps
                 <Bar dataKey="overheadCost" name="Overhead" fill="#8b5cf6" stackId="b" radius={[4, 4, 0, 0]} />
               </BarChart>
             )}
-          </ResponsiveContainer>
+            </ResponsiveContainer>
+          </div>
         </div>
-
-        {data.length > 10 && (
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            Showing top 10 of {data.length} clients by profit
-          </p>
-        )}
       </CardContent>
     </Card>
   )
