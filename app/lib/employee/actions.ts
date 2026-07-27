@@ -32,9 +32,11 @@ export async function saveEmployeeDepartments(formData: FormData) {
     redirect('/employee/onboarding?error=Please select at least one department')
   }
 
-  // determine new role - client_servicing users keep employee privileges
+  // determine new role - planning and client_servicing users keep the same admin-side permissions
   const newRole: 'employee' | 'client_servicing' =
-    departments.includes('client_servicing') ? 'client_servicing' : 'employee'
+    departments.some((department) => department === 'client_servicing' || department === 'planning')
+      ? 'client_servicing'
+      : 'employee'
 
   console.log('saveEmployeeDepartments', {
     user: user.id,
