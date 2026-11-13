@@ -29,14 +29,19 @@ import {
   type Department,
   type TaskStatus,
   type SubtaskWithRelations,
+  type Client,
+  type EmployeeWithDepartments,
 } from '@/types/database'
 import { getStatusColor, getDepartmentColor } from '@/lib/taskColors'
 
 interface TaskListProps {
   tasks: TaskWithRelations[]
+  clients: Client[]
+  employees: EmployeeWithDepartments[]
+  orgId: string | null
 }
 
-export function TaskList({ tasks: initialTasks }: TaskListProps) {
+export function TaskList({ tasks: initialTasks, clients, employees, orgId }: TaskListProps) {
   const [tasks, setTasks] = useState(initialTasks)
   const [editingTask, setEditingTask] = useState<TaskWithRelations | null>(null)
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
@@ -358,6 +363,9 @@ export function TaskList({ tasks: initialTasks }: TaskListProps) {
       {editingTask && (
         <EditTaskForm
           task={editingTask}
+          clients={clients}
+          employees={employees}
+          orgId={orgId}
           open={!!editingTask}
           onOpenChange={(open) => !open && setEditingTask(null)}
           onTaskUpdated={handleTaskUpdated}

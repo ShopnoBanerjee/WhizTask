@@ -2,36 +2,119 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import type { Client, Department, Task, TaskStatus, TaskWithRelations, EmployeeWithDepartments, PaginatedTasks, Subtask, SubtaskWithRelations } from '@/types/database'
+import { getOrgContext, assigneeOrFilter, type OrgContext } from '@/lib/auth/context'
+import type { Client, Department, TaskStatus, TaskWithRelations, EmployeeWithDepartments, PaginatedTasks, TaskFilters, TaskFormOptions } from '@/types/database'
 
-// ============ CLIENTS ============
+const TASK_WITH_SUBTASKS = `
+  *,
+  client:clients(*),
+  assigned_employee:profiles!tasks_assigned_to_fkey(id, email, name),
+  subtasks(
+    *,
+    assigned_employee:profiles!subtasks_assigned_to_fkey(id, email, name)
+  )
+`
 
-export async function getClients(): Promise<Client[]> {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
+// ---- internal queries: take an already-resolved context so one server action
+// can run several of them in parallel without re-authenticating each time ----
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.org_id) return []
-
+async function fetchClients({ supabase, orgId }: OrgContext): Promise<Client[]> {
   const { data, error } = await supabase
     .from('clients')
     .select('*')
-    .eq('org_id', profile.org_id)
+    .eq('org_id', orgId)
     .order('name')
 
   if (error) {
     console.error('Error fetching clients:', error)
     return []
   }
-
   return data || []
+}
+
+async function fetchOrgEmployees({ supabase, orgId }: OrgContext): Promise<EmployeeWithDepartments[]> {
+  // client_servicing users are employees too and can be assigned work
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*, employee_departments(department)')
+    .eq('org_id', orgId)
+    .in('role', ['employee', 'client_servicing'])
+    .order('name')
+
+  if (error || !data) return []
+
+  // People removed from the organisation are not offered for new work
+  return data.filter((p) => p.is_active !== false).map((p) => ({
+    id: p.id,
+    name: p.name,
+    email: p.email,
+    departments: p.employee_departments?.map((d: any) => d.department as Department) || [],
+  }))
+}
+
+async function fetchTasks(ctx: OrgContext, filters?: TaskFilters): Promise<TaskWithRelations[]> {
+  const { supabase, orgId } = ctx
+
+  let query = supabase
+    .from('tasks')
+    .select(TASK_WITH_SUBTASKS)
+    .eq('org_id', orgId)
+    .order('deadline', { ascending: true })
+
+  // Bounds are ISO instants computed in the browser, so "a day" means the
+  // viewer's day rather than the server's (UTC) day. Either bound is optional.
+  if (filters?.startDate) query = query.gte('deadline', filters.startDate)
+  if (filters?.endDate) query = query.lte('deadline', filters.endDate)
+  if (filters?.department) query = query.eq('department', filters.department)
+  if (filters?.status) query = query.eq('status', filters.status)
+  if (filters?.clientId) query = query.eq('client_id', filters.clientId)
+
+  if (filters?.assignedTo) {
+    const assignee = await assigneeOrFilter(supabase, orgId, filters.assignedTo)
+    if (!assignee) return []
+    query = query.or(assignee)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching tasks:', error)
+    return []
+  }
+  return data || []
+}
+
+// ============ CLIENTS ============
+
+export async function getClients(): Promise<Client[]> {
+  const ctx = await getOrgContext()
+  return ctx ? fetchClients(ctx) : []
+}
+
+// Clients, employees (with departments) and the org id in a single round trip.
+// Server actions run one at a time, so the screens that used to call
+// getClients + getOrgEmployees + getProfile separately waited for all three.
+export async function getTaskFormOptions(): Promise<TaskFormOptions> {
+  const ctx = await getOrgContext()
+  if (!ctx) return { clients: [], employees: [], orgId: null }
+
+  const [clients, employees] = await Promise.all([fetchClients(ctx), fetchOrgEmployees(ctx)])
+  return { clients, employees, orgId: ctx.orgId }
+}
+
+// First load of the admin Tasks page: the task list plus the form options.
+export async function getTasksPageData(
+  filters?: TaskFilters
+): Promise<TaskFormOptions & { tasks: TaskWithRelations[] }> {
+  const ctx = await getOrgContext()
+  if (!ctx) return { tasks: [], clients: [], employees: [], orgId: null }
+
+  const [tasks, clients, employees] = await Promise.all([
+    fetchTasks(ctx, filters),
+    fetchClients(ctx),
+    fetchOrgEmployees(ctx),
+  ])
+  return { tasks, clients, employees, orgId: ctx.orgId }
 }
 
 export async function createClient_DB(formData: FormData) {
@@ -134,64 +217,22 @@ export async function getEmployeesByDepartment(department: Department): Promise<
 }
 
 export async function getOrgEmployees(): Promise<EmployeeWithDepartments[]> {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.org_id) return []
-
-  // Get all employees with their departments
-  const { data, error } = await supabase
-    .from('profiles')
-    .select(`
-      id,
-      name,
-      email,
-      employee_departments (
-        department
-      )
-    `)
-    .eq('org_id', profile.org_id)
-    .eq('role', 'employee')
-
-  if (error || !data) return []
-
-  const employees: EmployeeWithDepartments[] = data.map((p) => ({
-    id: p.id,
-    name: p.name,
-    email: p.email,
-    departments: p.employee_departments?.map((d: any) => d.department as Department) || [],
-  }))
-
-  return employees
+  const ctx = await getOrgContext()
+  return ctx ? fetchOrgEmployees(ctx) : []
 }
 
 // ============ TASKS ============
 
 export async function createTask(formData: FormData) {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.org_id) return { error: 'No organization found' }
+  const ctx = await getOrgContext()
+  if (!ctx) return { error: 'Not authenticated' }
+  const { supabase } = ctx
+  const user = { id: ctx.userId }
+  const profile = { org_id: ctx.orgId }
 
   const client_id = formData.get('client_id') as string
   const department = formData.get('department') as string
-  const assigned_to = formData.get('assigned_to') as string
+  const assigned_to = normalizeAssignee(formData.get('assigned_to'))
   const deadline = formData.get('deadline') as string
   const details = formData.get('details') as string
   const attachmentsJson = formData.get('attachments') as string
@@ -262,84 +303,9 @@ export async function createTask(formData: FormData) {
   return { success: true, task: data }
 }
 
-export async function getTasks(filters?: {
-  date?: string
-  startDate?: string
-  endDate?: string
-  department?: Department
-  assignedTo?: string
-  status?: TaskStatus
-  clientId?: string // added so admin page can filter by client like history
-}): Promise<TaskWithRelations[]> {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.org_id) return []
-
-  let query = supabase
-    .from('tasks')
-    .select(`
-      *,
-      client:clients(*),
-      assigned_employee:profiles!tasks_assigned_to_fkey(id, email, name),
-      subtasks(
-        *,
-        assigned_employee:profiles!subtasks_assigned_to_fkey(id, email, name)
-      )
-    `)
-    .eq('org_id', profile.org_id)
-    .order('deadline', { ascending: true })
-
-  if (filters?.date) {
-    const startOfDay = new Date(filters.date)
-    startOfDay.setHours(0, 0, 0, 0)
-    const endOfDay = new Date(filters.date)
-    endOfDay.setHours(23, 59, 59, 999)
-    
-    query = query
-      .gte('deadline', startOfDay.toISOString())
-      .lte('deadline', endOfDay.toISOString())
-  }
-
-  if (filters?.startDate && filters?.endDate) {
-    query = query
-      .gte('deadline', filters.startDate)
-      .lte('deadline', filters.endDate)
-  }
-
-  if (filters?.department) {
-    query = query.eq('department', filters.department)
-  }
-
-  if (filters?.assignedTo) {
-    query = query.eq('assigned_to', filters.assignedTo)
-  }
-
-  if (filters?.status) {
-    query = query.eq('status', filters.status)
-  }
-
-  // advanced filtering added for admin task page
-  if (filters?.clientId) {
-    query = query.eq('client_id', filters.clientId)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
-    console.error('Error fetching tasks:', error)
-    return []
-  }
-
-  return data || []
+export async function getTasks(filters?: TaskFilters): Promise<TaskWithRelations[]> {
+  const ctx = await getOrgContext()
+  return ctx ? fetchTasks(ctx, filters) : []
 }
 
 export async function updateTaskStatus(taskId: string, status: TaskStatus) {
@@ -378,91 +344,51 @@ export async function deleteTask(taskId: string) {
 export async function getHistoryTasks(filters?: {
   page?: number
   limit?: number
-  startDate?: string
-  endDate?: string
+  startDate?: string // ISO instant, inclusive
+  endDate?: string // ISO instant, inclusive
   clientId?: string
   assignedTo?: string
 }): Promise<PaginatedTasks> {
-  const supabase = await createClient()
-
-  const page = filters?.page || 1
+  const page = Math.max(1, filters?.page || 1)
   const limit = filters?.limit || 10
   const offset = (page - 1) * limit
+  const empty: PaginatedTasks = { data: [], total: 0, page, limit, totalPages: 0 }
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return {
-      data: [],
-      total: 0,
-      page,
-      limit,
-      totalPages: 0
-    }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.org_id) {
-    return {
-      data: [],
-      total: 0,
-      page,
-      limit,
-      totalPages: 0
-    }
-  }
+  const ctx = await getOrgContext()
+  if (!ctx) return empty
+  const { supabase, orgId } = ctx
 
   let query = supabase
     .from('tasks')
-    .select(`
-      *,
-      client:clients(*),
-      assigned_employee:profiles!tasks_assigned_to_fkey(id, email, name)
-    `, { count: 'exact' })
-    .eq('org_id', profile.org_id)
+    .select(TASK_WITH_SUBTASKS, { count: 'exact' })
+    .eq('org_id', orgId)
     .order('updated_at', { ascending: false })
 
-  if (filters?.startDate && filters?.endDate) {
-    query = query
-      .gte('updated_at', filters.startDate)
-      .lte('updated_at', filters.endDate)
-  }
-
-  if (filters?.clientId) {
-    query = query.eq('client_id', filters.clientId)
-  }
+  if (filters?.startDate) query = query.gte('updated_at', filters.startDate)
+  if (filters?.endDate) query = query.lte('updated_at', filters.endDate)
+  if (filters?.clientId) query = query.eq('client_id', filters.clientId)
 
   if (filters?.assignedTo) {
-    query = query.eq('assigned_to', filters.assignedTo)
+    // Also match tasks the employee works on through a subtask
+    const assignee = await assigneeOrFilter(supabase, orgId, filters.assignedTo)
+    if (!assignee) return empty
+    query = query.or(assignee)
   }
 
-  const { data, error, count } = await query
-    .range(offset, offset + limit - 1)
+  const { data, error, count } = await query.range(offset, offset + limit - 1)
 
   if (error) {
     console.error('Error fetching history tasks:', error)
-    return {
-      data: [],
-      total: 0,
-      page,
-      limit,
-      totalPages: 0
-    }
+    return empty
   }
 
   const total = count || 0
-  const totalPages = Math.ceil(total / limit)
-
   return {
     data: data || [],
     total,
     page,
     limit,
-    totalPages
+    totalPages: Math.ceil(total / limit),
   }
 }
 
@@ -628,32 +554,14 @@ export async function deleteSubtask(subtaskId: string) {
 }
 
 export async function getTaskById(taskId: string): Promise<TaskWithRelations | null> {
-  const supabase = await createClient()
+  const ctx = await getOrgContext()
+  if (!ctx) return null
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.org_id) return null
-
-  const { data, error } = await supabase
+  const { data, error } = await ctx.supabase
     .from('tasks')
-    .select(`
-      *,
-      client:clients(*),
-      assigned_employee:profiles!tasks_assigned_to_fkey(id, email, name),
-      subtasks(
-        *,
-        assigned_employee:profiles!subtasks_assigned_to_fkey(id, email, name)
-      )
-    `)
+    .select(TASK_WITH_SUBTASKS)
     .eq('id', taskId)
-    .eq('org_id', profile.org_id)
+    .eq('org_id', ctx.orgId)
     .single()
 
   if (error) {
@@ -664,23 +572,20 @@ export async function getTaskById(taskId: string): Promise<TaskWithRelations | n
   return data
 }
 
+// The edit form's "Unassigned" option submits a placeholder, not an id
+function normalizeAssignee(value: FormDataEntryValue | null): string {
+  return typeof value === 'string' && value !== 'unassigned' ? value : ''
+}
+
 export async function updateTask(taskId: string, formData: FormData) {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.org_id) return { error: 'No organization found' }
+  const ctx = await getOrgContext()
+  if (!ctx) return { error: 'Not authenticated' }
+  const { supabase } = ctx
+  const profile = { org_id: ctx.orgId }
 
   const client_id = formData.get('client_id') as string
   const department = formData.get('department') as string
-  const assigned_to = formData.get('assigned_to') as string
+  const assigned_to = normalizeAssignee(formData.get('assigned_to'))
   const deadline = formData.get('deadline') as string
   const details = formData.get('details') as string
   const attachmentsJson = formData.get('attachments') as string
@@ -731,11 +636,7 @@ export async function updateTask(taskId: string, formData: FormData) {
     return { error: taskError.message }
   }
 
-  // Delete removed subtasks
   const subtasksToDelete = [...existingSubtaskIds].filter(id => !newSubtaskIds.has(id))
-  if (subtasksToDelete.length > 0) {
-    await supabase.from('subtasks').delete().in('id', subtasksToDelete)
-  }
 
   // Process subtasks: update existing, create new
   const subtasksToCreate: any[] = []
@@ -769,29 +670,29 @@ export async function updateTask(taskId: string, formData: FormData) {
     }
   })
 
-  // Update existing subtasks
-  for (const st of subtasksToUpdate) {
-    const { id, ...updateData } = st
-    await supabase.from('subtasks').update(updateData).eq('id', id)
-  }
+  // Deletes, updates and inserts touch different rows, so run them together
+  // instead of one round trip per subtask
+  const writes = await Promise.all([
+    subtasksToDelete.length > 0
+      ? supabase.from('subtasks').delete().in('id', subtasksToDelete)
+      : null,
+    ...subtasksToUpdate.map(({ id, ...updateData }) =>
+      supabase.from('subtasks').update(updateData).eq('id', id)
+    ),
+    subtasksToCreate.length > 0
+      ? supabase.from('subtasks').insert(subtasksToCreate)
+      : null,
+  ])
 
-  // Create new subtasks
-  if (subtasksToCreate.length > 0) {
-    await supabase.from('subtasks').insert(subtasksToCreate)
+  const failedWrite = writes.find((result) => result?.error)
+  if (failedWrite?.error) {
+    return { error: `Task saved, but a subtask change failed: ${failedWrite.error.message}` }
   }
 
   // Fetch the complete updated task with subtasks
   const { data: completeTask } = await supabase
     .from('tasks')
-    .select(`
-      *,
-      client:clients(*),
-      assigned_employee:profiles!tasks_assigned_to_fkey(id, email, name),
-      subtasks(
-        *,
-        assigned_employee:profiles!subtasks_assigned_to_fkey(id, email, name)
-      )
-    `)
+    .select(TASK_WITH_SUBTASKS)
     .eq('id', taskId)
     .single()
 

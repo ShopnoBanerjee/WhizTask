@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
-import { format } from 'date-fns'
+import { format, startOfDay, endOfDay } from 'date-fns'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -58,9 +58,10 @@ export function EmployeeHistory() {
         limit: 10,
       }
 
-      if (dateRange.from && dateRange.to) {
-        filters.startDate = dateRange.from.toISOString()
-        filters.endDate = dateRange.to.toISOString()
+      // A single picked day means that whole day
+      if (dateRange.from) {
+        filters.startDate = startOfDay(dateRange.from).toISOString()
+        filters.endDate = endOfDay(dateRange.to ?? dateRange.from).toISOString()
       }
 
       const result = await getEmployeeTaskHistory(filters)

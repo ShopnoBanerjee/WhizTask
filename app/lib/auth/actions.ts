@@ -3,7 +3,27 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
 import type { UserRole } from '@/types/auth'
+
+// Base URL for links sent by email. Falls back to the request's own origin so
+// a missing NEXT_PUBLIC_SITE_URL can't produce "undefined/auth/..." links.
+async function getSiteUrl(): Promise<string> {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL
+  if (configured) {
+    const trimmed = configured.trim().replace(/\/+$/, '')
+    // Tolerate a value saved without a scheme (e.g. "my-app.vercel.app")
+    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+  }
+
+  const h = await headers()
+  const origin = h.get('origin')
+  if (origin) return origin
+
+  const host = h.get('x-forwarded-host') ?? h.get('host')
+  const proto = h.get('x-forwarded-proto') ?? 'http'
+  return `${proto}://${host}`
+}
 
 export async function signIn(formData: FormData) {
   const supabase = await createClient()
@@ -11,7 +31,7 @@ export async function signIn(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
@@ -20,9 +40,17 @@ export async function signIn(formData: FormData) {
     redirect(`/auth/error?message=${encodeURIComponent(error.message)}`)
   }
 
-  // Middleware will handle redirect based on org verification status
+  // Go straight to the dashboard. Redirecting to "/" left people on the public
+  // landing page, where they had to click "Sign in" a second time. The proxy
+  // still sends unverified or not-yet-onboarded users to the right step.
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', data.user.id)
+    .single()
+
   revalidatePath('/', 'layout')
-  redirect('/')
+  redirect(profile?.role === 'admin' ? '/admin' : '/employee')
 }
 
 export async function signUp(formData: FormData) {
@@ -41,7 +69,7 @@ export async function signUp(formData: FormData) {
         name,
         role,
       },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      emailRedirectTo: `${await getSiteUrl()}/auth/callback`,
     },
   })
 
@@ -119,11 +147,13 @@ export async function forgotPassword(formData: FormData) {
 
   const email = formData.get('email') as string
 
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/update-password`,
+  // The server client uses the PKCE flow, so the email link comes back with a
+  // `?code=` that must be exchanged for a session. Route it through
+  // /auth/callback, which does the exchange and then forwards to the form.
+  const siteUrl = await getSiteUrl()
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl}/auth/callback?next=/auth/update-password`,
   })
-
-  console.log("RESET RESPONSE:", { data, error })
 
   if (error) {
     console.error(error)

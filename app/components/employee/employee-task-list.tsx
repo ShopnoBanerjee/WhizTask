@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { format, isPast } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -38,7 +38,8 @@ import {
   Loader2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { updateEmployeeTaskStatus, updateEmployeeSubtaskStatus, getEmployeeClients, getEmployeeTasks } from '@/lib/employee/actions'
+import { updateEmployeeTaskStatus, updateEmployeeSubtaskStatus, getEmployeeTasks } from '@/lib/employee/actions'
+import { todayLocal, dayStartIso, dayEndIso } from '@/lib/dates'
 import { 
   DEPARTMENTS, 
   TASK_STATUSES,
@@ -50,46 +51,53 @@ import {
 import { getStatusColor, getDepartmentColor } from '@/lib/taskColors'
 
 interface EmployeeTaskListProps {
-  initialTasks: TaskWithRelations[]
+  clients: Client[]
   currentUserId: string
 }
 
-export function EmployeeTaskList({ initialTasks, currentUserId }: EmployeeTaskListProps) {
-  const [tasks, setTasks] = useState(initialTasks)
-  const [loading, setLoading] = useState(false)
+export function EmployeeTaskList({ clients, currentUserId }: EmployeeTaskListProps) {
+  const [tasks, setTasks] = useState<TaskWithRelations[]>([])
+  const [loading, setLoading] = useState(true)
+  // The start date defaults to today. "Today" depends on the viewer's
+  // timezone, so it is set (and the first fetch made) in the browser.
+  const [ready, setReady] = useState(false)
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all')
   const [filterStart, setFilterStart] = useState('')
   const [filterEnd, setFilterEnd] = useState('')
   const [filterClient, setFilterClient] = useState('all')
-  const [clients, setClients] = useState<Client[]>([])
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
 
   // when filters change, fetch from server
+  const latestRequest = useRef(0)
+
+  useEffect(() => {
+    setFilterStart(todayLocal())
+    setReady(true)
+  }, [])
+
   const loadTasks = async () => {
+    // Ignore responses that arrive after a newer request was made
+    const requestId = ++latestRequest.current
     setLoading(true)
     try {
-      const params: any = {}
-      if (filterStatus !== 'all') params.status = filterStatus
-      if (filterClient !== 'all') params.clientId = filterClient
-      if (filterStart && filterEnd) {
-        params.startDate = filterStart
-        params.endDate = filterEnd
-      } else if (filterStart && !filterEnd) {
-        params.startDate = filterStart
-        params.endDate = new Date().toISOString()
-      }
-      const result = await getEmployeeTasks(params)
-      setTasks(result)
+      const result = await getEmployeeTasks({
+        status: filterStatus === 'all' ? undefined : filterStatus,
+        clientId: filterClient === 'all' ? undefined : filterClient,
+        // whole days in the viewer's timezone; each bound works on its own
+        startDate: filterStart ? dayStartIso(filterStart) : undefined,
+        endDate: filterEnd ? dayEndIso(filterEnd) : undefined,
+      })
+      if (requestId === latestRequest.current) setTasks(result)
     } catch (err) {
       console.error('Error loading employee tasks:', err)
     } finally {
-      setLoading(false)
+      if (requestId === latestRequest.current) setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadTasks()
-  }, [filterStatus, filterClient, filterStart, filterEnd])
+    if (ready) loadTasks()
+  }, [ready, filterStatus, filterClient, filterStart, filterEnd])
 
   const filteredTasks = tasks
 
@@ -159,18 +167,6 @@ export function EmployeeTaskList({ initialTasks, currentUserId }: EmployeeTaskLi
     return TASK_STATUSES.find(s => s.value === status)?.label || status
   }
 
-  // fetch client list for filter
-  useEffect(() => {
-    getEmployeeClients().then(setClients).catch(console.error)
-  }, [])
-
-  // auto-set end date when start date selected without end
-  useEffect(() => {
-    if (filterStart && !filterEnd) {
-      setFilterEnd(new Date().toISOString().split('T')[0])
-    }
-  }, [filterStart])
-
   // Get subtasks assigned to current user
   const getMySubtasks = (subtasks?: SubtaskWithRelations[]) => {
     if (!subtasks) return []
@@ -219,6 +215,7 @@ export function EmployeeTaskList({ initialTasks, currentUserId }: EmployeeTaskLi
             type="date"
             className="w-48"
             value={filterEnd}
+            min={filterStart || undefined}
             onChange={e => setFilterEnd(e.target.value)}
           />
         </div>
@@ -262,7 +259,13 @@ export function EmployeeTaskList({ initialTasks, currentUserId }: EmployeeTaskLi
       {filteredTasks.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">No tasks found</p>
+            <p className="text-muted-foreground">
+              {loading
+                ? 'Loading tasks...'
+                : filterStart || filterEnd
+                  ? 'No tasks are due in this date range. Clear the filters to see every task, including overdue ones.'
+                  : 'No tasks found'}
+            </p>
           </CardContent>
         </Card>
       ) : (

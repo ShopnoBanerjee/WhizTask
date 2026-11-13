@@ -156,6 +156,34 @@ export interface EmployeeWithDepartments {
   departments: Department[]
 }
 
+export interface TaskFilters {
+  startDate?: string // ISO instant, inclusive
+  endDate?: string // ISO instant, inclusive
+  department?: Department
+  assignedTo?: string
+  status?: TaskStatus
+  clientId?: string
+}
+
+// Everything the task filters and the create/edit forms need, in one fetch
+export interface TaskFormOptions {
+  clients: Client[]
+  employees: EmployeeWithDepartments[]
+  orgId: string | null
+}
+
+// A person in the organisation, as shown on the admin Members page
+export interface OrgMember {
+  id: string
+  name: string | null
+  email: string
+  role: Profile['role']
+  departments: Department[]
+  isActive: boolean // false = removed by an admin (access blocked, data kept)
+  removedAt: string | null
+  joinedAt: string
+}
+
 export const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB in bytes
 
 // ============ CLIENT FINANCIAL TYPES ============

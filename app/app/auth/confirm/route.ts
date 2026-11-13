@@ -18,6 +18,11 @@ export async function GET(request: Request) {
     if (!error) {
       // Get the user after verification
       const { data: { user } } = await supabase.auth.getUser()
+      // Recovery links belong to existing users, who already have a profile
+      if (type === 'recovery') {
+        return NextResponse.redirect(`${origin}/auth/update-password`)
+      }
+
       if (user) {
         // Create profile
         const role = user.user_metadata?.role || 'employee'

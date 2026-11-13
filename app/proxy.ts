@@ -4,12 +4,28 @@ import { createClient } from '@/lib/supabase/proxy'
 const publicRoutes = ['/', '/auth/login', '/auth/signup', '/auth/signup-success', '/auth/error', '/auth/forgot-password', '/auth/callback', '/auth/confirm']
 const authRoutes = ['/auth/login', '/auth/signup', '/auth/forgot-password']
 
+const ACCESS_REMOVED_PATH = '/auth/access-removed'
+
+// An admin removed this person from the organisation. Their data is kept, but
+// every page except the notice (and signing out) is closed to them.
+function isRemoved(profile: { is_active?: boolean | null } | null): boolean {
+  return profile?.is_active === false
+}
+
+function accessRemoved(request: NextRequest) {
+  return NextResponse.redirect(new URL(ACCESS_REMOVED_PATH, request.url))
+}
+
 export async function proxy(request: NextRequest) {
   const { supabase, response } = createClient(request)
   const { pathname } = request.nextUrl
 
-  // Get user session
-  const { data: { user } } = await supabase.auth.getUser()
+  // Verify the session. getClaims() checks the JWT signature locally when the
+  // project uses asymmetric signing keys and otherwise falls back to asking the
+  // Auth server, so this is never slower than getUser(). It runs on every
+  // request, including each server action.
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const user = claimsData?.claims?.sub ? { id: claimsData.claims.sub } : null
 
   // Allow public routes
   if (publicRoutes.includes(pathname)) {
@@ -18,9 +34,11 @@ export async function proxy(request: NextRequest) {
       // Check if user is org verified
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role, is_org_verified, has_completed_onboarding')
+        .select('*')
         .eq('id', user.id)
         .single()
+
+      if (isRemoved(profile)) return accessRemoved(request)
 
       if (!profile?.is_org_verified) {
         return NextResponse.redirect(new URL('/auth/verify-org', request.url))
@@ -47,9 +65,11 @@ export async function proxy(request: NextRequest) {
     // Check if already verified
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role, is_org_verified, has_completed_onboarding')
+      .select('*')
       .eq('id', user.id)
       .single()
+
+    if (isRemoved(profile)) return accessRemoved(request)
 
     if (profile?.is_org_verified) {
       // Check if employee needs onboarding
@@ -71,9 +91,11 @@ export async function proxy(request: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role, is_org_verified, has_completed_onboarding')
+      .select('*')
       .eq('id', user.id)
       .single()
+
+    if (isRemoved(profile)) return accessRemoved(request)
 
     if (!profile?.is_org_verified) {
       return NextResponse.redirect(new URL('/auth/verify-org', request.url))
@@ -89,6 +111,24 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/employee', request.url))
     }
 
+    return response
+  }
+
+  // Shown to members an admin has removed. Anyone else is sent on their way.
+  if (pathname === ACCESS_REMOVED_PATH) {
+    if (!user) {
+      return NextResponse.redirect(new URL('/auth/login', request.url))
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (!isRemoved(profile)) {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
     return response
   }
 
@@ -108,9 +148,11 @@ export async function proxy(request: NextRequest) {
   // Get user profile for role and org verification
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_org_verified, has_completed_onboarding')
+    .select('*')
     .eq('id', user.id)
     .single()
+
+  if (isRemoved(profile)) return accessRemoved(request)
 
   // If not org verified, redirect to verify-org page
   if (!profile?.is_org_verified) {
@@ -131,10 +173,11 @@ export async function proxy(request: NextRequest) {
     if (profile.role === 'admin') {
       // allowed
     } else if (profile.role === 'client_servicing') {
-      // restrict to tasks/history only
+      // restrict to tasks/history/members only
       if (
         !pathname.startsWith('/admin/tasks') &&
         !pathname.startsWith('/admin/history') &&
+        !pathname.startsWith('/admin/members') &&
         pathname !== '/admin'
       ) {
         console.log('redirect client_servicing from admin route', pathname)
