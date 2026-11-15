@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { getOrgContext, assigneeOrFilter } from '@/lib/auth/context'
 import type { 
   Department, 
   TaskWithRelations, 
@@ -138,116 +139,84 @@ export async function updateEmployeeProfile(formData: FormData) {
 
 // ============ EMPLOYEE TASKS ============
 
+const EMPLOYEE_TASK_SELECT = `
+  *,
+  client:clients(*),
+  subtasks(
+    *,
+    assigned_employee:profiles!subtasks_assigned_to_fkey(id, name, email)
+  )
+`
+
 export async function getEmployeeTasks(filters?: {
   status?: TaskStatus
-  startDate?: string
-  endDate?: string
+  startDate?: string // ISO instant, inclusive
+  endDate?: string // ISO instant, inclusive
   clientId?: string
 }): Promise<TaskWithRelations[]> {
-  const supabase = await createClient()
+  const ctx = await getOrgContext()
+  if (!ctx) return []
+  const { supabase, userId, orgId } = ctx
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.org_id) return []
-
-  // Get tasks directly assigned to user (limited to org)
+  // Tasks assigned to the user directly, filtered on the task's own deadline
   let directQuery = supabase
     .from('tasks')
-    .select(`
-      *,
-      client:clients(*),
-      subtasks(
-        *,
-        assigned_employee:profiles!subtasks_assigned_to_fkey(id, name, email)
-      )
-    `)
-    .eq('assigned_to', user.id)
-    .eq('org_id', profile.org_id)
+    .select(EMPLOYEE_TASK_SELECT)
+    .eq('assigned_to', userId)
+    .eq('org_id', orgId)
     .order('deadline', { ascending: true })
 
-  // Get tasks where user has assigned subtasks (limited to org)
+  // Tasks reached through a subtask. The date range applies to the user's own
+  // subtask deadline: the parent's deadline is the latest subtask's, so
+  // filtering on it hid subtasks that were due inside the chosen range.
   let subtaskQuery = supabase
     .from('subtasks')
     .select('task_id')
-    .eq('assigned_to', user.id)
-    .eq('org_id', profile.org_id)
+    .eq('assigned_to', userId)
+    .eq('org_id', orgId)
 
-  if (filters?.status) {
-    directQuery = directQuery.eq('status', filters.status)
+  if (filters?.status) directQuery = directQuery.eq('status', filters.status)
+  if (filters?.clientId) directQuery = directQuery.eq('client_id', filters.clientId)
+  if (filters?.startDate) {
+    directQuery = directQuery.gte('deadline', filters.startDate)
+    subtaskQuery = subtaskQuery.gte('deadline', filters.startDate)
+  }
+  if (filters?.endDate) {
+    directQuery = directQuery.lte('deadline', filters.endDate)
+    subtaskQuery = subtaskQuery.lte('deadline', filters.endDate)
   }
 
-  if (filters?.startDate && filters?.endDate) {
-    directQuery = directQuery
-      .gte('deadline', filters.startDate)
-      .lte('deadline', filters.endDate)
-  }
-
-  if (filters?.clientId) {
-    directQuery = directQuery.eq('client_id', filters.clientId)
-  }
-
-  const [directResult, subtaskResult] = await Promise.all([
-    directQuery,
-    subtaskQuery
-  ])
+  const [directResult, subtaskResult] = await Promise.all([directQuery, subtaskQuery])
 
   if (directResult.error) {
     console.error('Error fetching employee tasks:', JSON.stringify(directResult.error))
     return []
   }
 
-  // Get unique task IDs from subtasks
-  const subtaskTaskIds = [...new Set(subtaskResult.data?.map(s => s.task_id) || [])]
-  const directTaskIds = directResult.data?.map(t => t.id) || []
-  
-  // Filter out tasks already in direct results
-  const additionalTaskIds = subtaskTaskIds.filter(id => !directTaskIds.includes(id))
+  let allTasks: TaskWithRelations[] = directResult.data || []
 
-  let allTasks = directResult.data || []
+  const directTaskIds = new Set(allTasks.map(t => t.id))
+  const additionalTaskIds = [...new Set(subtaskResult.data?.map(s => s.task_id) || [])]
+    .filter(id => !directTaskIds.has(id))
 
-  // Fetch additional tasks where user has subtasks
   if (additionalTaskIds.length > 0) {
     let additionalQuery = supabase
       .from('tasks')
-      .select(`
-        *,
-        client:clients(*),
-        subtasks(
-          *,
-          assigned_employee:profiles!subtasks_assigned_to_fkey(id, name, email)
-        )
-      `)
+      .select(EMPLOYEE_TASK_SELECT)
       .in('id', additionalTaskIds)
-      .eq('org_id', profile.org_id)
-      .order('deadline', { ascending: true })
+      .eq('org_id', orgId)
 
-    if (filters?.status) {
-      additionalQuery = additionalQuery.eq('status', filters.status)
-    }
+    if (filters?.status) additionalQuery = additionalQuery.eq('status', filters.status)
+    if (filters?.clientId) additionalQuery = additionalQuery.eq('client_id', filters.clientId)
 
-    if (filters?.startDate && filters?.endDate) {
-      additionalQuery = additionalQuery
-        .gte('deadline', filters.startDate)
-        .lte('deadline', filters.endDate)
-    }
-    if (filters?.clientId) {
-      additionalQuery = additionalQuery.eq('client_id', filters.clientId)
-    }
-
-    const { data: additionalTasks } = await additionalQuery
-    if (additionalTasks) {
+    const { data: additionalTasks, error } = await additionalQuery
+    if (error) {
+      console.error('Error fetching subtask parents:', JSON.stringify(error))
+    } else if (additionalTasks) {
       allTasks = [...allTasks, ...additionalTasks]
     }
   }
 
-  // Sort by deadline
   allTasks.sort((a, b) => {
     const dateA = a.deadline ? new Date(a.deadline).getTime() : Infinity
     const dateB = b.deadline ? new Date(b.deadline).getTime() : Infinity
@@ -260,23 +229,13 @@ export async function getEmployeeTasks(filters?: {
 // === helpers ===
 
 export async function getEmployeeClients(): Promise<Client[]> {
-  const supabase = await createClient()
+  const ctx = await getOrgContext()
+  if (!ctx) return []
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.org_id) return []
-
-  const { data, error } = await supabase
+  const { data, error } = await ctx.supabase
     .from('clients')
     .select('*')
-    .eq('org_id', profile.org_id)
+    .eq('org_id', ctx.orgId)
     .order('name')
 
   if (error) {
@@ -795,107 +754,48 @@ export async function getDailyTimeStats(date: string): Promise<DailyTimeStats> {
 export async function getEmployeeTaskHistory(filters?: {
   page?: number
   limit?: number
-  startDate?: string
-  endDate?: string
+  startDate?: string // ISO instant, inclusive
+  endDate?: string // ISO instant, inclusive
 }) {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { data: [], total: 0, page: 1, limit: 10, totalPages: 0 }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.org_id) return { data: [], total: 0, page: 1, limit: 10, totalPages: 0 }
-
-  const page = filters?.page || 1
+  const page = Math.max(1, filters?.page || 1)
   const limit = filters?.limit || 10
   const offset = (page - 1) * limit
+  const empty = { data: [] as TaskWithRelations[], total: 0, page, limit, totalPages: 0 }
 
-  // Get completed tasks directly assigned to user (limited to org)
-  let directQuery = supabase
+  const ctx = await getOrgContext()
+  if (!ctx) return empty
+  const { supabase, userId, orgId } = ctx
+
+  // Completed tasks the user worked on, directly or through a completed
+  // subtask, as ONE paginated query. Previously only directly-assigned tasks
+  // were counted and paged, and every subtask task was appended to each page.
+  const mine = await assigneeOrFilter(supabase, orgId, userId, 'completed')
+  if (!mine) return empty
+
+  let query = supabase
     .from('tasks')
-    .select(`
-      *,
-      client:clients(*),
-      subtasks(
-        *,
-        assigned_employee:profiles!subtasks_assigned_to_fkey(id, name, email)
-      )
-    `, { count: 'exact' })
-    .eq('assigned_to', user.id)
-    .eq('org_id', profile.org_id)
+    .select(EMPLOYEE_TASK_SELECT, { count: 'exact' })
+    .eq('org_id', orgId)
     .eq('status', 'completed')
+    .or(mine)
     .order('updated_at', { ascending: false })
 
-  if (filters?.startDate && filters?.endDate) {
-    directQuery = directQuery
-      .gte('updated_at', filters.startDate)
-      .lte('updated_at', filters.endDate)
+  if (filters?.startDate) query = query.gte('updated_at', filters.startDate)
+  if (filters?.endDate) query = query.lte('updated_at', filters.endDate)
+
+  const { data, error, count } = await query.range(offset, offset + limit - 1)
+
+  if (error) {
+    console.error('Error fetching task history:', JSON.stringify(error))
+    return empty
   }
 
-  const { data: directTasks, error: directError, count: directCount } = await directQuery
-    .range(offset, offset + limit - 1)
-
-  if (directError) {
-    console.error('Error fetching task history:', JSON.stringify(directError))
-    return { data: [], total: 0, page, limit, totalPages: 0 }
+  const total = count || 0
+  return {
+    data: (data || []) as TaskWithRelations[],
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
   }
-
-  // Also get tasks where user had completed subtasks
-  const { data: completedSubtasks } = await supabase
-    .from('subtasks')
-    .select('task_id')
-    .eq('assigned_to', user.id)
-    .eq('org_id', profile.org_id)
-    .eq('status', 'completed')
-
-  const subtaskTaskIds = [...new Set(completedSubtasks?.map(s => s.task_id) || [])]
-  const directTaskIds = directTasks?.map(t => t.id) || []
-  const additionalTaskIds = subtaskTaskIds.filter(id => !directTaskIds.includes(id))
-
-  let allTasks = directTasks || []
-
-  if (additionalTaskIds.length > 0) {
-    let additionalQuery = supabase
-      .from('tasks')
-      .select(`
-        *,
-        client:clients(*),
-        subtasks(
-          *,
-          assigned_employee:profiles!subtasks_assigned_to_fkey(id, name, email)
-        )
-      `)
-      .in('id', additionalTaskIds)
-      .eq('org_id', profile.org_id)
-      .eq('status', 'completed')
-      .order('updated_at', { ascending: false })
-
-    if (filters?.startDate && filters?.endDate) {
-      additionalQuery = additionalQuery
-        .gte('updated_at', filters.startDate)
-        .lte('updated_at', filters.endDate)
-    }
-
-    const { data: additionalTasks } = await additionalQuery
-    if (additionalTasks) {
-      allTasks = [...allTasks, ...additionalTasks]
-    }
-  }
-
-  // Sort by updated_at descending
-  allTasks.sort((a, b) => {
-    const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0
-    const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0
-    return dateB - dateA
-  })
-
-  const total = directCount || 0
-  const totalPages = Math.ceil(total / limit)
-
-  return { data: allTasks, total, page, limit, totalPages }
 }

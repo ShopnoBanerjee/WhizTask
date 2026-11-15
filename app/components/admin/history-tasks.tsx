@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Table,
   TableBody,
@@ -30,8 +30,9 @@ import {
 } from '@/components/ui/pagination'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
-import type { PaginatedTasks, Client, EmployeeWithDepartments } from '@/types/database'
-import { getHistoryTasks, getClients, getOrgEmployees } from '@/lib/admin/actions'
+import type { PaginatedTasks, Client, EmployeeWithDepartments, TaskWithRelations } from '@/types/database'
+import { getHistoryTasks, getTaskFormOptions } from '@/lib/admin/actions'
+import { dayStartIso, dayEndIso } from '@/lib/dates'
 import { DEPARTMENTS } from '@/types/database'
 import { getStatusColor, getDepartmentColor } from '@/lib/taskColors'
 
@@ -47,7 +48,8 @@ export function HistoryTasks({ initialData }: HistoryTasksProps) {
     limit: 10,
     totalPages: 0
   })
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const latestRequest = useRef(0)
   const [clients, setClients] = useState<Client[]>([])
   const [employees, setEmployees] = useState<EmployeeWithDepartments[]>([])
 
@@ -57,44 +59,65 @@ export function HistoryTasks({ initialData }: HistoryTasksProps) {
   const [clientId, setClientId] = useState('all')
   const [assignedTo, setAssignedTo] = useState('all')
 
+  // The page number only applies to the filters it was chosen under, so
+  // changing a filter starts again from page 1. Staying on, say, page 4 of a
+  // result that now has one page showed "No tasks found".
+  const filterKey = [startDate, endDate, clientId, assignedTo].join('|')
+  const [pageFor, setPageFor] = useState({ key: filterKey, page: 1 })
+  const page = pageFor.key === filterKey ? pageFor.page : 1
+
   const loadFilters = async () => {
-    const [clientsData, employeesData] = await Promise.all([
-      getClients(),
-      getOrgEmployees()
-    ])
-    setClients(clientsData)
-    setEmployees(employeesData)
+    // one request for both dropdowns
+    const options = await getTaskFormOptions()
+    setClients(options.clients)
+    setEmployees(options.employees)
   }
 
   const loadTasks = useCallback(async () => {
+    // Ignore responses that arrive after a newer request was made, so a slow
+    // earlier query can't overwrite the results for the current filters
+    const requestId = ++latestRequest.current
     setLoading(true)
     try {
       const result = await getHistoryTasks({
-        page: data.page,
-        limit: data.limit,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
+        page,
+        limit: 10,
+        // whole days in the viewer's timezone; each bound works on its own
+        startDate: startDate ? dayStartIso(startDate) : undefined,
+        endDate: endDate ? dayEndIso(endDate) : undefined,
         clientId: clientId === 'all' ? undefined : clientId,
         assignedTo: assignedTo === 'all' ? undefined : assignedTo,
       })
-      setData(result)
+      if (requestId === latestRequest.current) setData(result)
     } catch (error) {
       console.error('Error loading tasks:', error)
     } finally {
-      setLoading(false)
+      if (requestId === latestRequest.current) setLoading(false)
     }
-  }, [data.page, data.limit, startDate, endDate, clientId, assignedTo])
-
-  useEffect(() => {
-    loadFilters()
-  }, [])
+  }, [page, startDate, endDate, clientId, assignedTo])
 
   useEffect(() => {
     loadTasks()
   }, [loadTasks])
 
-  const handlePageChange = (page: number) => {
-    setData(prev => ({ ...prev, page }))
+  useEffect(() => {
+    loadFilters()
+  }, [])
+
+  const handlePageChange = (next: number) => {
+    setPageFor({ key: filterKey, page: next })
+  }
+
+  // Tasks split into subtasks have no assignee of their own: list the people
+  // working on the subtasks instead of showing "Unassigned"
+  const getAssignees = (task: TaskWithRelations) => {
+    if (task.assigned_employee) return task.assigned_employee.name || task.assigned_employee.email
+    const names = [...new Set(
+      (task.subtasks || [])
+        .map(st => st.assigned_employee?.name || st.assigned_employee?.email)
+        .filter((n): n is string => !!n)
+    )]
+    return names.length > 0 ? names.join(', ') : 'Unassigned'
   }
 
   const formatDate = (dateString: string) => {
@@ -248,7 +271,7 @@ export function HistoryTasks({ initialData }: HistoryTasksProps) {
                     {formatDate(task.updated_at)}
                   </TableCell>
                   <TableCell className="font-medium">
-                    {task.client.name}
+                    {task.client?.name || 'Unknown client'}
                   </TableCell>
                   <TableCell>
                     <Badge className={getDepartmentColor(task.department)}>
@@ -261,7 +284,7 @@ export function HistoryTasks({ initialData }: HistoryTasksProps) {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm">
-                    {task.assigned_employee?.name || task.assigned_employee?.email || 'Unassigned'}
+                    {getAssignees(task)}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
                     {task.details || 'No details'}

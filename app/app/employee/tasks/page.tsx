@@ -1,11 +1,11 @@
 import { EmployeeTaskList } from '@/components/employee/employee-task-list'
-import { getEmployeeTasks } from '@/lib/employee/actions'
-import { createClient } from '@/lib/supabase/server'
+import { getEmployeeClients } from '@/lib/employee/actions'
+import { getOrgContext } from '@/lib/auth/context'
 
 export default async function EmployeeTasksPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const tasks = await getEmployeeTasks()
+  // Tasks are loaded by the list itself: it defaults to "due from today",
+  // and today depends on the viewer's timezone
+  const [ctx, clients] = await Promise.all([getOrgContext(), getEmployeeClients()])
 
   return (
     <div className="space-y-6">
@@ -14,7 +14,7 @@ export default async function EmployeeTasksPage() {
         <p className="text-muted-foreground">View and manage all your assigned tasks</p>
       </div>
 
-      <EmployeeTaskList initialTasks={tasks} currentUserId={user?.id || ''} />
+      <EmployeeTaskList clients={clients} currentUserId={ctx?.userId || ''} />
     </div>
   )
 }

@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { ChevronUp, LogOut, ClipboardList, History, BarChart3, Users, Clock, User } from 'lucide-react'
+import { ChevronUp, LogOut, ClipboardList, History, BarChart3, Users, Clock, User, UserCog } from 'lucide-react'
 import { signOut } from '@/lib/auth/actions'
 
 // nav item interface reused by server component (not strictly needed client-side)
@@ -41,6 +41,9 @@ export function SidebarClient({ userEmail, role }: SidebarClientProps) {
       { title: 'Analytics', url: '/admin/analytics', Icon: BarChart3 },
       { title: 'Clients', url: '/admin/clients', Icon: Users }
     )
+  }
+  if (role === 'admin' || role === 'client_servicing') {
+    navItems.push({ title: 'Members', url: '/admin/members', Icon: UserCog })
   }
   if (role === 'employee' || role === 'client_servicing') {
     navItems.push(

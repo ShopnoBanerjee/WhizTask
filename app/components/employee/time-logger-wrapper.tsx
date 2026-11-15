@@ -20,7 +20,9 @@ interface TimeLoggerWrapperProps {
 }
 
 export function TimeLoggerWrapper({ tasks, initialLogs, initialDate, currentUserId }: TimeLoggerWrapperProps) {
-  const [selectedDate, setSelectedDate] = useState(new Date(initialDate))
+  // Parse as local midnight; a bare yyyy-MM-dd is read as UTC and can land
+  // on the previous day
+  const [selectedDate, setSelectedDate] = useState(new Date(`${initialDate}T00:00:00`))
   const [blocks, setBlocks] = useState<TimeBlock[]>([])
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [selectedSubtaskId, setSelectedSubtaskId] = useState<string | null>(null)
@@ -38,10 +40,21 @@ export function TimeLoggerWrapper({ tasks, initialLogs, initialDate, currentUser
       setRefreshKey(prev => prev + 1)
     }
     
-    if (dateString !== format(new Date(initialDate), 'yyyy-MM-dd')) {
+    if (dateString !== initialDate) {
       fetchLogs()
     }
   }, [dateString, initialDate])
+
+  // The server picks the initial day in its own timezone (UTC when deployed),
+  // which is still "yesterday" for the first hours of the day in India. Move
+  // to the viewer's today on load.
+  useEffect(() => {
+    if (format(new Date(), 'yyyy-MM-dd') !== initialDate) {
+      // One-off correction after hydration: the browser's date is only known here
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedDate(new Date())
+    }
+  }, [initialDate])
 
   const handlePrevDay = () => {
     setSelectedDate(prev => subDays(prev, 1))
