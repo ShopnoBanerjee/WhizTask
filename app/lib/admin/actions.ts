@@ -223,9 +223,18 @@ export async function getOrgEmployees(): Promise<EmployeeWithDepartments[]> {
 
 // ============ TASKS ============
 
+// Creating a task for anyone, and editing tasks, is for admins and client
+// servicing. Employees add tasks for themselves through createOwnTask.
+const CANNOT_ASSIGN = 'Only admins and client servicing can assign tasks to other people'
+
+function canAssignOthers(ctx: OrgContext): boolean {
+  return ctx.role === 'admin' || ctx.role === 'client_servicing'
+}
+
 export async function createTask(formData: FormData) {
   const ctx = await getOrgContext()
   if (!ctx) return { error: 'Not authenticated' }
+  if (!canAssignOthers(ctx)) return { error: CANNOT_ASSIGN }
   const { supabase } = ctx
   const user = { id: ctx.userId }
   const profile = { org_id: ctx.orgId }
@@ -580,6 +589,7 @@ function normalizeAssignee(value: FormDataEntryValue | null): string {
 export async function updateTask(taskId: string, formData: FormData) {
   const ctx = await getOrgContext()
   if (!ctx) return { error: 'Not authenticated' }
+  if (!canAssignOthers(ctx)) return { error: CANNOT_ASSIGN }
   const { supabase } = ctx
   const profile = { org_id: ctx.orgId }
 
