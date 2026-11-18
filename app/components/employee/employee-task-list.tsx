@@ -40,22 +40,29 @@ import {
 import { cn } from '@/lib/utils'
 import { updateEmployeeTaskStatus, updateEmployeeSubtaskStatus, getEmployeeTasks } from '@/lib/employee/actions'
 import { todayLocal, dayStartIso, dayEndIso } from '@/lib/dates'
+import { AddOwnTaskForm } from './add-own-task-form'
 import { 
   DEPARTMENTS, 
   TASK_STATUSES,
   type TaskWithRelations, 
   type TaskStatus,
   type SubtaskWithRelations,
-  type Client
+  type Client,
+  type Department
 } from '@/types/database'
 import { getStatusColor, getDepartmentColor } from '@/lib/taskColors'
 
 interface EmployeeTaskListProps {
   clients: Client[]
   currentUserId: string
+  // Everyone with a My Tasks page can add a task for themselves here, in any
+  // of their own departments. Assigning work to other people stays on the
+  // admin Tasks page (admins and client servicing only).
+  departments: Department[]
+  orgId: string | null
 }
 
-export function EmployeeTaskList({ clients, currentUserId }: EmployeeTaskListProps) {
+export function EmployeeTaskList({ clients, currentUserId, departments, orgId }: EmployeeTaskListProps) {
   const [tasks, setTasks] = useState<TaskWithRelations[]>([])
   const [loading, setLoading] = useState(true)
   // The start date defaults to today. "Today" depends on the viewer's
@@ -180,6 +187,15 @@ export function EmployeeTaskList({ clients, currentUserId }: EmployeeTaskListPro
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <AddOwnTaskForm
+          clients={clients}
+          departments={departments}
+          orgId={orgId}
+          onTaskCreated={loadTasks}
+        />
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
         <div className="space-y-1">

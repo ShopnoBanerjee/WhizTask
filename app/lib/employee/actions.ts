@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { getOrgContext, assigneeOrFilter } from '@/lib/auth/context'
+import { getOrgContext, assigneeOrFilter, isUuid } from '@/lib/auth/context'
 import type { 
   Department, 
   TaskWithRelations, 
@@ -798,4 +798,78 @@ export async function getEmployeeTaskHistory(filters?: {
     limit,
     totalPages: Math.ceil(total / limit),
   }
+}
+
+// ============ ADDING OWN TASKS ============
+
+// An employee adds a task for themselves. The assignee is never read from the
+// request: it is always the signed-in user, so this cannot be used to give
+// work to someone else. (Admins and client servicing assign tasks to others
+// from the admin Tasks page.)
+export async function createOwnTask(formData: FormData) {
+  const ctx = await getOrgContext()
+  if (!ctx) return { error: 'Not authenticated' }
+  const { supabase, userId, orgId } = ctx
+
+  const client_id = formData.get('client_id')
+  const department = formData.get('department')
+  const deadline = formData.get('deadline')
+  const details = formData.get('details')
+  const attachmentsJson = formData.get('attachments')
+
+  if (typeof client_id !== 'string' || !isUuid(client_id)) return { error: 'Please select a client' }
+  if (typeof department !== 'string' || !department) return { error: 'Please select a department' }
+  if (typeof deadline !== 'string' || isNaN(new Date(deadline).getTime())) {
+    return { error: 'Please set a deadline' }
+  }
+
+  let attachments: unknown = []
+  try {
+    attachments = typeof attachmentsJson === 'string' && attachmentsJson ? JSON.parse(attachmentsJson) : []
+  } catch {
+    return { error: 'Invalid attachments' }
+  }
+  if (!Array.isArray(attachments)) return { error: 'Invalid attachments' }
+
+  // The client must belong to this organisation, and the department must be
+  // one the employee is actually in
+  const [clientResult, departmentResult] = await Promise.all([
+    supabase.from('clients').select('id').eq('id', client_id).eq('org_id', orgId).maybeSingle(),
+    supabase.from('employee_departments').select('department').eq('employee_id', userId),
+  ])
+
+  if (!clientResult.data) return { error: 'Client not found' }
+
+  const ownDepartments = (departmentResult.data || []).map((d) => d.department as string)
+  if (!ownDepartments.includes(department)) {
+    return { error: 'You can only add tasks in your own departments' }
+  }
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert({
+      client_id,
+      department,
+      assigned_to: userId,
+      deadline: new Date(deadline).toISOString(),
+      details: typeof details === 'string' && details.trim() ? details : null,
+      attachments,
+      org_id: orgId,
+      created_by: userId,
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    console.error('Error adding own task:', JSON.stringify(error))
+    // 42501: blocked by row-level security, i.e. the policy has not been added
+    if (error.code === '42501') {
+      return { error: 'Adding your own tasks is not enabled yet. Ask an admin to run supabase/migrations/20261118000000_employee_own_tasks.sql.' }
+    }
+    return { error: error.message }
+  }
+
+  revalidatePath('/employee')
+  revalidatePath('/admin/tasks')
+  return { success: true, taskId: data.id as string }
 }
