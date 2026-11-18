@@ -65,7 +65,7 @@ export function EmployeePerformanceTable({ data }: EmployeePerformanceTableProps
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">Employee Performance</CardTitle>
-          {topPerformer && (
+          {topPerformer && topPerformer.totalHoursLogged > 0 && (
             <Badge variant="outline" className="gap-1">
               <TrendingUp className="size-3" />
               Top: {topPerformer.employeeName || topPerformer.email.split('@')[0]}
@@ -116,10 +116,19 @@ export function EmployeePerformanceTable({ data }: EmployeePerformanceTableProps
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <span className="font-medium">{emp.tasksCompleted}</span>
-                    <span className="text-muted-foreground">/{emp.tasksAssigned}</span>
+                    {emp.tasksAssigned === 0 ? (
+                      <span className="text-muted-foreground" title="Nothing to measure in this period">—</span>
+                    ) : (
+                      <>
+                        <span className="font-medium">{emp.tasksCompleted}</span>
+                        <span className="text-muted-foreground">/{emp.tasksAssigned}</span>
+                      </>
+                    )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-center">
+                    {emp.tasksAssigned === 0 ? (
+                      <span className="text-muted-foreground" title="Nothing to measure in this period">—</span>
+                    ) : (
                     <div className="flex items-center justify-center gap-2">
                       <ProgressBar 
                         value={emp.completionRate} 
@@ -127,8 +136,12 @@ export function EmployeePerformanceTable({ data }: EmployeePerformanceTableProps
                       />
                       <span className="text-sm w-10">{emp.completionRate.toFixed(0)}%</span>
                     </div>
+                    )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-center">
+                    {emp.tasksCompleted === 0 ? (
+                      <span className="text-muted-foreground" title="Nothing to measure in this period">—</span>
+                    ) : (
                     <div className="flex items-center justify-center gap-2">
                       <ProgressBar 
                         value={emp.onTimeRate} 
@@ -136,11 +149,12 @@ export function EmployeePerformanceTable({ data }: EmployeePerformanceTableProps
                       />
                       <span className="text-sm w-10">{emp.onTimeRate.toFixed(0)}%</span>
                     </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-center font-medium">
                     {emp.totalHoursLogged.toFixed(1)}h
                   </TableCell>
-                  <TableCell className="text-right font-medium text-green-400">
+                  <TableCell className="text-right font-medium">
                     {formatCurrency(emp.valueGenerated)}
                   </TableCell>
                 </TableRow>

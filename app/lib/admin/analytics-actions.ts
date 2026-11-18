@@ -31,6 +31,32 @@ async function getOrgId(): Promise<string | null> {
   return profile?.org_id || null
 }
 
+// How many months a yyyy-MM-dd range covers, counting part months by their
+// share of days. Counting every calendar month touched made "last 30 days"
+// (19 Oct to 18 Nov) two months and doubled the revenue.
+function monthsInPeriod(startDate: string, endDate: string): number {
+  const [sy, sm, sd] = startDate.split('-').map(Number)
+  const [ey, em, ed] = endDate.split('-').map(Number)
+  if (![sy, sm, sd, ey, em, ed].every(Number.isFinite)) return 1
+
+  let months = 0
+  let year = sy
+  let month = sm
+  while (year < ey || (year === ey && month <= em)) {
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+    const from = year === sy && month === sm ? sd : 1
+    const to = year === ey && month === em ? ed : daysInMonth
+    months += Math.max(0, to - from + 1) / daysInMonth
+    if (month === 12) {
+      year += 1
+      month = 1
+    } else {
+      month += 1
+    }
+  }
+  return months > 0 ? months : 1
+}
+
 function calculateHourlyRate(ctcPerMonth: number): number {
   return ctcPerMonth / (WORKING_DAYS * WORKING_HOURS)
 }
@@ -52,7 +78,8 @@ export async function getEmployeeHourlyRates(): Promise<EmployeeHourlyRate[]> {
       employee_departments (department)
     `)
     .eq('org_id', orgId)
-    .eq('role', 'employee')
+    // client servicing are employees too: they log time and have a salary
+    .in('role', ['employee', 'client_servicing'])
 
   if (error || !employees) return []
 
@@ -233,10 +260,7 @@ export async function getClientProfitability(
 
   const totalOverhead = overheads?.reduce((sum, o) => sum + (o.value_per_month || 0), 0) || 0
 
-  // Calculate months in date range
-  const start = new Date(startDate)
-  const end = new Date(endDate)
-  const monthsInRange = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1)
+  const monthsInRange = monthsInPeriod(startDate, endDate)
 
   // Calculate retainership total for overhead apportionment
   const retainershipClients = clients.filter(c => c.type === 'retainership')
@@ -331,13 +355,25 @@ export async function getEmployeePerformance(
   // Get employees with CTC
   const employeeRates = await getEmployeeHourlyRates()
 
+  // Deadlines are timestamps: a bare end date means midnight and drops
+  // everything due later that day
+  const deadlineEnd = `${endDate}T23:59:59.999Z`
+
   // Get tasks assigned to employees in date range
   const { data: tasks } = await supabase
     .from('tasks')
     .select('id, assigned_to, status, deadline, updated_at')
     .eq('org_id', orgId)
     .gte('deadline', startDate)
-    .lte('deadline', endDate)
+    .lte('deadline', deadlineEnd)
+
+  // Work split into subtasks is assigned on the subtask, not the task
+  const { data: subtasks } = await supabase
+    .from('subtasks')
+    .select('id, assigned_to, status, deadline, updated_at')
+    .eq('org_id', orgId)
+    .gte('deadline', startDate)
+    .lte('deadline', deadlineEnd)
 
   // Get time logs
   const { data: timeLogs } = await supabase
@@ -365,8 +401,8 @@ export async function getEmployeePerformance(
     })
   })
 
-  // Aggregate tasks
-  tasks?.forEach(task => {
+  // Aggregate tasks and subtasks
+  ;[...(tasks ?? []), ...(subtasks ?? [])].forEach(task => {
     if (!task.assigned_to) return
     
     const perf = perfMap.get(task.assigned_to)
@@ -442,6 +478,7 @@ export async function getAnalyticsSummary(
     : 0
 
   const totalRevenue = clientProfitability.reduce((sum, c) => sum + c.totalRevenue, 0)
+  const monthlyRevenue = clientProfitability.reduce((sum, c) => sum + c.monthlyRevenue, 0)
   const totalCost = clientProfitability.reduce((sum, c) => sum + c.totalCost, 0)
   const totalHoursLogged = clientProfitability.reduce((sum, c) => sum + c.totalHours, 0)
   const netProfit = totalRevenue - totalCost
@@ -450,6 +487,9 @@ export async function getAnalyticsSummary(
   return {
     totalHoursLogged: Math.round(totalHoursLogged * 100) / 100,
     totalEmployees,
+    employeeCount: employeeRates.length,
+    monthlyRevenue: Math.round(monthlyRevenue * 100) / 100,
+    clientCount: clientProfitability.length,
     avgHourlyRate: Math.round(avgHourlyRate * 100) / 100,
     totalRevenue: Math.round(totalRevenue * 100) / 100,
     totalCost: Math.round(totalCost * 100) / 100,

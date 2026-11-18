@@ -33,6 +33,7 @@ import {
   type EmployeeWithDepartments,
 } from '@/types/database'
 import { getStatusColor, getDepartmentColor } from '@/lib/taskColors'
+import { taskTitle, hasMoreDetails } from '@/lib/task-title'
 
 interface TaskListProps {
   tasks: TaskWithRelations[]
@@ -158,7 +159,7 @@ export function TaskList({ tasks: initialTasks, clients, employees, orgId }: Tas
 
       {/* Task grid */}
       <ScrollArea className="h-[calc(100vh-280px)]">
-        <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+        <div className="grid items-start gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
           {tasks.map((task) => {
             const subtaskProgress = hasSubtasks(task) ? getSubtaskProgress(task.subtasks!) : null
             const isExpanded = expandedTasks.has(task.id)
@@ -167,7 +168,10 @@ export function TaskList({ tasks: initialTasks, clients, employees, orgId }: Tas
               <Card key={task.id}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{task.client.name}</CardTitle>
+                    <div className="min-w-0">
+                      <CardTitle className="text-base leading-snug line-clamp-2">{taskTitle(task)}</CardTitle>
+                      <p className="mt-1 text-sm text-muted-foreground">{task.client?.name || 'Unknown client'}</p>
+                    </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
@@ -244,7 +248,7 @@ export function TaskList({ tasks: initialTasks, clients, employees, orgId }: Tas
                       </div>
                     )}
 
-                    {task.details && (
+                    {hasMoreDetails(task) && (
                       <p className="text-sm text-muted-foreground line-clamp-2">
                         {task.details}
                       </p>

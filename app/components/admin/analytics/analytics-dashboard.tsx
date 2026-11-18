@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { format, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { CalendarIcon, Clock, Users, TrendingUp, DollarSign, Settings } from 'lucide-react'
+import { CalendarIcon, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { HourlyRateCard } from '@/components/admin/analytics/hourly-rate-card'
 import { ClientHoursChart } from '@/components/admin/analytics/client-hours-chart'
@@ -51,43 +51,72 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value)
 
-function SummaryCard({ 
-  title, 
-  value, 
-  subtitle, 
-  icon: Icon,
-  trend 
-}: { 
-  title: string
-  value: string
-  subtitle?: string
-  icon: React.ElementType
-  trend?: 'up' | 'down' | 'neutral'
-}) {
+// The period's money in one divided panel: label over figure, no icons.
+// Revenue leads because it answers the screen's question; profit is only
+// coloured when it is a loss, and a margin is only shown when there are costs
+// to measure it against.
+function SummaryStrip({ summary }: { summary: AnalyticsSummary }) {
+  const hasCosts = summary.totalCost > 0
+  const clients = summary.clientCount ?? 0
+  const people = summary.employeeCount ?? summary.totalEmployees
+
+  const cells = [
+    {
+      label: 'Revenue',
+      value: formatCurrency(summary.totalRevenue),
+      note: `${formatCurrency(summary.monthlyRevenue ?? 0)} a month across ${clients} client${clients === 1 ? '' : 's'}`,
+      lead: true,
+    },
+    {
+      label: 'Costs',
+      value: formatCurrency(summary.totalCost),
+      note: hasCosts ? 'Labour, software and overheads' : 'None recorded for this period',
+    },
+    {
+      label: 'Net profit',
+      value: formatCurrency(summary.netProfit),
+      note: hasCosts ? `${summary.profitMargin.toFixed(1)}% margin` : 'Margin needs cost data',
+      loss: summary.netProfit < 0,
+    },
+    {
+      label: 'Hours logged',
+      value: `${summary.totalHoursLogged.toFixed(1)} h`,
+      note: `${summary.totalEmployees} of ${people} ${people === 1 ? 'person has' : 'people have'} a salary set`,
+    },
+  ]
+
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">{title}</p>
-            <p className={cn(
-              'text-2xl font-bold mt-1',
-              trend === 'up' && 'text-green-400',
-              trend === 'down' && 'text-red-400'
-            )}>
-              {value}
-            </p>
-            {subtitle && (
-              <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
-            )}
+    <Card className="py-0">
+      <dl className="grid divide-y lg:grid-cols-4 lg:divide-x lg:divide-y-0">
+        {cells.map((cell) => (
+          <div key={cell.label} className="px-6 py-5">
+            <dt className="text-sm text-muted-foreground">{cell.label}</dt>
+            <dd
+              className={cn(
+                'mt-1 font-semibold tabular-nums',
+                cell.lead ? 'text-3xl' : 'text-2xl',
+                cell.loss && 'text-red-400'
+              )}
+            >
+              {cell.value}
+            </dd>
+            <dd className="mt-1 text-xs text-muted-foreground">{cell.note}</dd>
           </div>
-          <div className="p-2 bg-muted rounded-lg">
-            <Icon className="size-5 text-muted-foreground" />
-          </div>
-        </div>
-      </CardContent>
+        ))}
+      </dl>
     </Card>
   )
+}
+
+// One sentence on what the period's numbers mean
+function findingFor(summary: AnalyticsSummary): string {
+  if (summary.totalCost <= 0) {
+    return 'No costs are recorded, so profit equals revenue. Add salaries in Settings to see real margins.'
+  }
+  if (summary.netProfit < 0) {
+    return `Running at a loss of ${formatCurrency(Math.abs(summary.netProfit))} for this period.`
+  }
+  return `Net profit of ${formatCurrency(summary.netProfit)} at a ${summary.profitMargin.toFixed(1)}% margin.`
 }
 
 export function AnalyticsDashboard({ initialData, startDate, endDate }: AnalyticsDashboardProps) {
@@ -170,6 +199,7 @@ export function AnalyticsDashboard({ initialData, startDate, endDate }: Analytic
           <p className="text-muted-foreground">
             {format(dateRange.from, 'MMM d, yyyy')} - {format(dateRange.to, 'MMM d, yyyy')}
           </p>
+          <p className="mt-1 text-sm">{findingFor(summary)}</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -221,44 +251,20 @@ export function AnalyticsDashboard({ initialData, startDate, endDate }: Analytic
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-6 mt-6">
-          {/* Summary cards */}
-          <div className={cn('grid gap-4 sm:grid-cols-2 lg:grid-cols-4', loading && 'opacity-50')}>
-            <SummaryCard
-              title="Total Hours Logged"
-              value={`${summary.totalHoursLogged.toFixed(1)}h`}
-              subtitle={`${summary.totalEmployees} employees`}
-              icon={Clock}
-            />
-            <SummaryCard
-              title="Avg Hourly Rate"
-              value={formatCurrency(summary.avgHourlyRate)}
-              subtitle="Per employee"
-              icon={Users}
-            />
-            <SummaryCard
-              title="Total Revenue"
-              value={formatCurrency(summary.totalRevenue)}
-              subtitle={`Cost: ${formatCurrency(summary.totalCost)}`}
-              icon={DollarSign}
-            />
-            <SummaryCard
-              title="Net Profit"
-              value={formatCurrency(summary.netProfit)}
-              subtitle={`${summary.profitMargin.toFixed(1)}% margin`}
-              icon={TrendingUp}
-              trend={summary.netProfit >= 0 ? 'up' : 'down'}
-            />
+          {/* Summary */}
+          <div className={cn(loading && 'opacity-50')}>
+            <SummaryStrip summary={summary} />
           </div>
 
-          {/* Charts grid */}
-          <div className={cn('grid gap-6 lg:grid-cols-2', loading && 'opacity-50')}>
-            <ClientHoursChart data={clientHours} />
-            <HourlyRateCard employees={employeeRates} avgHourlyRate={summary.avgHourlyRate} />
-          </div>
-
-          {/* Profitability chart - full width */}
+          {/* Profitability first: it is the block that explains the summary */}
           <div className={cn(loading && 'opacity-50')}>
             <ClientProfitabilityChart data={clientProfitability} />
+          </div>
+
+          {/* Each card keeps its own height, so an empty one stays small */}
+          <div className={cn('grid items-start gap-6 lg:grid-cols-2', loading && 'opacity-50')}>
+            <ClientHoursChart data={clientHours} />
+            <HourlyRateCard employees={employeeRates} avgHourlyRate={summary.avgHourlyRate} />
           </div>
 
           {/* Employee performance - full width */}
