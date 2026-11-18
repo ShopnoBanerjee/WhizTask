@@ -6,7 +6,16 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { signUp } from '@/lib/auth/actions'
 
-export default function SignupPage() {
+interface PageProps {
+  searchParams: Promise<{ name?: string; role?: string }>
+}
+
+export default async function SignupPage({ searchParams }: PageProps) {
+  // The landing page's "Create an account" panel hands over a name and role
+  const params = await searchParams
+  const defaultName = typeof params.name === 'string' ? params.name.slice(0, 80) : ''
+  const defaultRole = params.role === 'admin' || params.role === 'employee' ? params.role : undefined
+
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
@@ -22,7 +31,8 @@ export default function SignupPage() {
                 id="name"
                 name="name"
                 type="text"
-                placeholder="John Doe"
+                placeholder="Your name"
+                defaultValue={defaultName}
                 required
               />
             </div>
@@ -49,7 +59,7 @@ export default function SignupPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
-              <Select name="role" required>
+              <Select name="role" defaultValue={defaultRole} required>
                 <SelectTrigger>
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>

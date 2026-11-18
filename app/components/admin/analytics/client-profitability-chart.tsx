@@ -53,7 +53,7 @@ export function ClientProfitabilityChart({ data }: ClientProfitabilityChartProps
     hours: client.totalHours,
   }))
 
-  const totalProfit = data.reduce((sum, c) => sum + c.grossProfit, 0)
+  const hasCosts = data.some((c) => c.totalCost > 0)
   const avgMargin = data.length > 0
     ? data.reduce((sum, c) => sum + c.profitMargin, 0) / data.length
     : 0
@@ -79,12 +79,11 @@ export function ClientProfitabilityChart({ data }: ClientProfitabilityChartProps
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <CardTitle className="text-base">Client Profitability</CardTitle>
+            {/* The totals are in the summary above; this line only says what the bars mean */}
             <p className="text-sm text-muted-foreground mt-1">
-              Net Profit: <span className={totalProfit >= 0 ? 'text-green-400 font-medium' : 'text-red-400 font-medium'}>
-                {formatCurrency(totalProfit)}
-              </span>
-              <span className="mx-2">•</span>
-              Avg Margin: <span className="font-medium">{avgMargin.toFixed(1)}%</span>
+              {hasCosts
+                ? `Profit per client · average margin ${avgMargin.toFixed(1)}%`
+                : 'Revenue per client · no costs recorded yet'}
             </p>
           </div>
           <div className="flex gap-1">
@@ -144,7 +143,7 @@ export function ClientProfitabilityChart({ data }: ClientProfitabilityChartProps
                   dataKey="profit" 
                   name="Profit"
                   radius={[4, 4, 0, 0]}
-                  fill="#10b981"
+                  fill="#eaca08"
                 />
               </BarChart>
             ) : (

@@ -37,16 +37,19 @@ export function HourlyRateCard({ employees, avgHourlyRate }: HourlyRateCardProps
         </p>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 p-4 bg-muted/50 rounded-lg">
-          <p className="text-sm text-muted-foreground">Organization Average</p>
-          <p className="text-2xl font-bold">
-            {formatCurrency(avgHourlyRate)}<span className="text-sm font-normal text-muted-foreground">/hr</span>
-          </p>
-        </div>
+        {/* An average of nothing is not ₹0: only show it once salaries exist */}
+        {employeesWithCTC.length > 0 && (
+          <div className="mb-4 p-4 bg-muted/50 rounded-lg">
+            <p className="text-sm text-muted-foreground">Organization Average</p>
+            <p className="text-2xl font-bold">
+              {formatCurrency(avgHourlyRate)}<span className="text-sm font-normal text-muted-foreground">/hr</span>
+            </p>
+          </div>
+        )}
 
         {employeesWithCTC.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No employee CTC data available. Add CTC in settings.
+          <p className="text-sm text-muted-foreground">
+            No salaries entered yet. Add each person&apos;s monthly CTC in the Settings tab to get hourly rates and labour costs.
           </p>
         ) : (
           <Table>

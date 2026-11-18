@@ -51,6 +51,7 @@ import {
   type Department
 } from '@/types/database'
 import { getStatusColor, getDepartmentColor } from '@/lib/taskColors'
+import { taskTitle, hasMoreDetails } from '@/lib/task-title'
 
 interface EmployeeTaskListProps {
   clients: Client[]
@@ -285,7 +286,7 @@ export function EmployeeTaskList({ clients, currentUserId, departments, orgId }:
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid items-start gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredTasks.map(task => {
             const isOverdue = isPast(new Date(task.deadline)) && task.status !== 'completed'
             const hasSubtasks = task.subtasks && task.subtasks.length > 0
@@ -303,9 +304,10 @@ export function EmployeeTaskList({ clients, currentUserId, departments, orgId }:
               <Card key={task.id} className={cn(isOverdue && 'border-destructive/50')}>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
-                    <CardTitle className="text-base">
-                      {task.client?.name || 'Unknown Client'}
-                    </CardTitle>
+                    <div className="min-w-0">
+                      <CardTitle className="text-base leading-snug line-clamp-2">{taskTitle(task)}</CardTitle>
+                      <p className="mt-1 text-sm text-muted-foreground">{task.client?.name || 'Unknown client'}</p>
+                    </div>
                     {/* Only show status dropdown if directly assigned and no subtasks */}
                     {directlyAssigned && !hasSubtasks && (
                       <DropdownMenu>
@@ -342,9 +344,9 @@ export function EmployeeTaskList({ clients, currentUserId, departments, orgId }:
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <p className="text-sm text-muted-foreground line-clamp-3">
-                    {task.details || 'No details provided'}
-                  </p>
+                  {hasMoreDetails(task) && (
+                    <p className="text-sm text-muted-foreground line-clamp-3">{task.details}</p>
+                  )}
                   
                   <div className={cn(
                     'flex items-center gap-1 text-sm',

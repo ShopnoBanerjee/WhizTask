@@ -410,7 +410,10 @@ export interface EmployeePerformance {
 
 export interface AnalyticsSummary {
   totalHoursLogged: number
-  totalEmployees: number
+  totalEmployees: number // people with a salary (CTC) set
+  employeeCount?: number // everyone who can log time
+  monthlyRevenue?: number // revenue per month, the same figure the Clients page shows
+  clientCount?: number
   avgHourlyRate: number
   totalRevenue: number
   totalCost: number
