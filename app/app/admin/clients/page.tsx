@@ -60,13 +60,13 @@ export default async function ClientsPage() {
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Monthly Revenue</p>
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(summary.totalMonthlyRevenue)}</p>
+              <p className="text-2xl font-bold text-green-400">{formatCurrency(summary.totalMonthlyRevenue)}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Monthly Costs</p>
-              <p className="text-2xl font-bold text-orange-600">
+              <p className="text-2xl font-bold text-orange-400">
                 {formatCurrency(summary.totalSoftwareCost + summary.totalOverheadCost)}
               </p>
               <p className="text-xs text-muted-foreground">
@@ -77,7 +77,7 @@ export default async function ClientsPage() {
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Net Monthly</p>
-              <p className={`text-2xl font-bold ${summary.totalNetRevenue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-2xl font-bold ${summary.totalNetRevenue >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 {formatCurrency(summary.totalNetRevenue)}
               </p>
             </CardContent>

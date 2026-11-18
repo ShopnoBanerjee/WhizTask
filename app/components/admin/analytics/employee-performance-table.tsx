@@ -140,7 +140,7 @@ export function EmployeePerformanceTable({ data }: EmployeePerformanceTableProps
                   <TableCell className="text-center font-medium">
                     {emp.totalHoursLogged.toFixed(1)}h
                   </TableCell>
-                  <TableCell className="text-right font-medium text-green-600">
+                  <TableCell className="text-right font-medium text-green-400">
                     {formatCurrency(emp.valueGenerated)}
                   </TableCell>
                 </TableRow>

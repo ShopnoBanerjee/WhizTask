@@ -411,7 +411,7 @@ export function TimeLogger({ date, tasks, initialLogs, currentUserId, onBlocksCh
         )
       case 'saved':
         return (
-          <span className="flex items-center gap-1 text-xs text-green-600">
+          <span className="flex items-center gap-1 text-xs text-green-400">
             <Check className="size-3" />
             Saved
           </span>

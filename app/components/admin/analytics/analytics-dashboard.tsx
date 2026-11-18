@@ -72,8 +72,8 @@ function SummaryCard({
             <p className="text-sm text-muted-foreground">{title}</p>
             <p className={cn(
               'text-2xl font-bold mt-1',
-              trend === 'up' && 'text-green-600',
-              trend === 'down' && 'text-red-600'
+              trend === 'up' && 'text-green-400',
+              trend === 'down' && 'text-red-400'
             )}>
               {value}
             </p>

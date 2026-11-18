@@ -80,7 +80,7 @@ export function ClientProfitabilityChart({ data }: ClientProfitabilityChartProps
           <div>
             <CardTitle className="text-base">Client Profitability</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Net Profit: <span className={totalProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+              Net Profit: <span className={totalProfit >= 0 ? 'text-green-400 font-medium' : 'text-red-400 font-medium'}>
                 {formatCurrency(totalProfit)}
               </span>
               <span className="mx-2">•</span>
@@ -130,7 +130,7 @@ export function ClientProfitabilityChart({ data }: ClientProfitabilityChartProps
                         <div className="border-t pt-2 mt-2 space-y-1">
                           <p className="text-sm">Revenue: {formatCurrency(data.revenue)}</p>
                           <p className="text-sm">Cost: {formatCurrency(data.totalCost)}</p>
-                          <p className={`font-bold ${data.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          <p className={`font-bold ${data.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             Profit: {formatCurrency(data.profit)}
                           </p>
                           <p className="text-sm">Margin: {data.margin.toFixed(1)}%</p>
@@ -139,7 +139,7 @@ export function ClientProfitabilityChart({ data }: ClientProfitabilityChartProps
                     )
                   }}
                 />
-                <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
+                <ReferenceLine y={0} stroke="#737373" strokeDasharray="3 3" />
                 <Bar 
                   dataKey="profit" 
                   name="Profit"
@@ -163,7 +163,7 @@ export function ClientProfitabilityChart({ data }: ClientProfitabilityChartProps
                       <div className="bg-popover border rounded-lg shadow-lg p-3 space-y-1">
                         <p className="font-medium">{data.fullName}</p>
                         <div className="border-t pt-2 mt-2 space-y-1">
-                          <p className="text-sm">Revenue: <span className="font-medium text-green-600">{formatCurrency(data.revenue)}</span></p>
+                          <p className="text-sm">Revenue: <span className="font-medium text-green-400">{formatCurrency(data.revenue)}</span></p>
                           <p className="text-sm">Labor: {formatCurrency(data.laborCost)}</p>
                           <p className="text-sm">Software: {formatCurrency(data.softwareCost)}</p>
                           <p className="text-sm">Overhead: {formatCurrency(data.overheadCost)}</p>

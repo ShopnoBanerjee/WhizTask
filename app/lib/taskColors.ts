@@ -1,26 +1,28 @@
 import { TaskStatus, Department } from '@/types/database'
 
+// Badge colours for a dark UI: a translucent tint of the hue with light text.
+// (The old bg-*-100 / text-*-800 pairs were made for a white page.)
+
 // Central color classes for task statuses
 export const STATUS_COLOR_CLASSES: Record<TaskStatus, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  in_progress: 'bg-blue-100 text-blue-800',
-  completed: 'bg-green-100 text-green-800',
-  overdue: 'bg-red-100 text-red-800',
+  pending: 'bg-yellow-500/15 text-yellow-300',
+  in_progress: 'bg-blue-500/15 text-blue-300',
+  completed: 'bg-green-500/15 text-green-300',
+  overdue: 'bg-red-500/15 text-red-300',
 }
 
 // Assign each department a unique color combination (background + text)
-// Feel free to adjust as needed; we use Tailwind utility classes
 export const DEPARTMENT_COLOR_CLASSES: Record<Department, string> = {
-  planning:        'bg-purple-100 text-purple-800',
-  client_servicing:'bg-indigo-100 text-indigo-800',
-  design:          'bg-pink-100 text-pink-800',
-  content:         'bg-emerald-100 text-emerald-800',
-  editing:         'bg-yellow-100 text-yellow-800',
-  shooting:        'bg-orange-100 text-orange-800',
-  seo:             'bg-teal-100 text-teal-800',
-  web_design:      'bg-sky-100 text-sky-800',
-  posting_reporting:'bg-fuchsia-100 text-fuchsia-800',
-  online_ads:      'bg-rose-100 text-rose-800',
+  planning:        'bg-purple-500/15 text-purple-300',
+  client_servicing:'bg-indigo-500/15 text-indigo-300',
+  design:          'bg-pink-500/15 text-pink-300',
+  content:         'bg-emerald-500/15 text-emerald-300',
+  editing:         'bg-amber-500/15 text-amber-300',
+  shooting:        'bg-orange-500/15 text-orange-300',
+  seo:             'bg-teal-500/15 text-teal-300',
+  web_design:      'bg-sky-500/15 text-sky-300',
+  posting_reporting:'bg-fuchsia-500/15 text-fuchsia-300',
+  online_ads:      'bg-rose-500/15 text-rose-300',
 }
 
 export function getStatusColor(status: TaskStatus) {

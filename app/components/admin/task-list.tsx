@@ -129,7 +129,7 @@ export function TaskList({ tasks: initialTasks, clients, employees, orgId }: Tas
       case 'completed':
         return <CheckCircle2 className="size-3.5" />
       case 'overdue':
-        return <Circle className="size-3.5 text-red-500" />
+        return <Circle className="size-3.5 text-red-400" />
       default:
         return null
     }
@@ -229,7 +229,7 @@ export function TaskList({ tasks: initialTasks, clients, employees, orgId }: Tas
                         className={cn(
                           isPast(new Date(task.deadline)) &&
                             task.status !== 'completed' &&
-                            'text-red-600 font-medium'
+                            'text-red-400 font-medium'
                         )}
                       >
                         {format(new Date(task.deadline), 'MMM d, yyyy')}
@@ -302,7 +302,7 @@ export function TaskList({ tasks: initialTasks, clients, employees, orgId }: Tas
                                     <span>{subtask.assigned_employee?.name || subtask.assigned_employee?.email || 'Unassigned'}</span>
                                     <span>•</span>
                                     <span className={cn(
-                                      isPast(new Date(subtask.deadline)) && subtask.status !== 'completed' && "text-red-600"
+                                      isPast(new Date(subtask.deadline)) && subtask.status !== 'completed' && "text-red-400"
                                     )}>
                                       {format(new Date(subtask.deadline), 'MMM d')}
                                     </span>

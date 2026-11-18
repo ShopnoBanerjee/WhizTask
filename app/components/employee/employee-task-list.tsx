@@ -160,9 +160,9 @@ export function EmployeeTaskList({ clients, currentUserId, departments, orgId }:
 
   const getStatusIcon = (status: TaskStatus) => {
     switch (status) {
-      case 'completed': return <CheckCircle2 className="size-4 text-green-600" />
-      case 'in_progress': return <Loader2 className="size-4 text-blue-600" />
-      default: return <Circle className="size-4 text-gray-400" />
+      case 'completed': return <CheckCircle2 className="size-4 text-green-400" />
+      case 'in_progress': return <Loader2 className="size-4 text-blue-400" />
+      default: return <Circle className="size-4 text-muted-foreground" />
     }
   }
 

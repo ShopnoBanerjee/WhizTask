@@ -110,14 +110,14 @@ export function ClientList({ clients }: ClientListProps) {
                 )}
 
                 {client.software_cost > 0 && (
-                  <div className="flex justify-between text-orange-600">
+                  <div className="flex justify-between text-orange-400">
                     <span>Software Cost</span>
                     <span>-{formatCurrency(client.software_cost)}</span>
                   </div>
                 )}
 
                 {client.overhead_cost > 0 && (
-                  <div className="flex justify-between text-orange-600">
+                  <div className="flex justify-between text-orange-400">
                     <span>Overhead Cost</span>
                     <span>-{formatCurrency(client.overhead_cost)}</span>
                   </div>
@@ -125,7 +125,7 @@ export function ClientList({ clients }: ClientListProps) {
 
                 <div className="flex justify-between border-t pt-1 font-medium">
                   <span>Net Value</span>
-                  <span className={client.net_value >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  <span className={client.net_value >= 0 ? 'text-green-400' : 'text-red-400'}>
                     {formatCurrency(client.net_value)}
                   </span>
                 </div>

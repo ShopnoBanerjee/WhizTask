@@ -58,7 +58,7 @@ export function SidebarClient({ userEmail, role }: SidebarClientProps) {
     <Sidebar>
       <SidebarHeader className="border-b p-4">
         <Link href="/" className="flex items-center gap-2">
-          <img src="/anonymous_logo.svg" alt="WhizTask Logo" className="h-12" />
+          <img src="/anonymous_logo_dark.svg" alt="WhizTask Logo" className="h-12" />
         </Link>
       </SidebarHeader>
 
