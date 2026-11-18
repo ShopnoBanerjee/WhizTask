@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { format } from 'date-fns'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -172,7 +173,7 @@ export function ProfileSettings({ profile, departments }: ProfileSettingsProps) 
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Member since</span>
-            <span>{new Date(profile.created_at).toLocaleDateString()}</span>
+            <span>{format(new Date(profile.created_at), 'MMM d, yyyy')}</span>
           </div>
         </CardContent>
       </Card>

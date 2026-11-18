@@ -46,39 +46,78 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
-:root {
-  --background: oklch(0.9789 0.0082 121.6272);
-  --foreground: oklch(0 0 0);
-  --card: oklch(1.0000 0 0);
-  --card-foreground: oklch(0 0 0);
-  --popover: oklch(1.0000 0 0);
-  --popover-foreground: oklch(0 0 0);
-  --primary: oklch(0.5106 0.2301 276.9656);
-  --primary-foreground: oklch(1.0000 0 0);
-  --secondary: oklch(0.7038 0.1230 182.5025);
-  --secondary-foreground: oklch(1.0000 0 0);
-  --muted: oklch(0.9551 0 0);
-  --muted-foreground: oklch(0.3211 0 0);
-  --accent: oklch(0.7686 0.1647 70.0804);
-  --accent-foreground: oklch(0 0 0);
-  --destructive: oklch(0.6368 0.2078 25.3313);
-  --destructive-foreground: oklch(1.0000 0 0);
-  --border: oklch(0 0 0);
-  --input: oklch(0.5555 0 0);
-  --ring: oklch(0.7853 0.1041 274.7134);
-  --chart-1: oklch(0.5106 0.2301 276.9656);
-  --chart-2: oklch(0.7038 0.1230 182.5025);
-  --chart-3: oklch(0.7686 0.1647 70.0804);
-  --chart-4: oklch(0.6559 0.2118 354.3084);
-  --chart-5: oklch(0.7227 0.1920 149.5793);
-  --sidebar: oklch(0.9789 0.0082 121.6272);
-  --sidebar-foreground: oklch(0 0 0);
-  --sidebar-primary: oklch(0.5106 0.2301 276.9656);
-  --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.7686 0.1647 70.0804);
-  --sidebar-accent-foreground: oklch(0 0 0);
-  --sidebar-border: oklch(0 0 0);
-  --sidebar-ring: oklch(0.7853 0.1041 274.7134);
+/*
+ * WhizTask theme: dark only.
+ *
+ * Brand colours
+ *   Black   #000000  page background
+ *   Yellow  #eaca08  primary actions, focus rings, active states
+ *
+ * Everything else is derived from those two: a neutral grey ramp lifted off
+ * black for surfaces, borders and text, yellow tints for hover/selected
+ * states, and a small set of status and chart colours tuned to read on black.
+ * There is no light theme, so the same values are set on :root and .dark
+ * (components use `dark:` variants, which need the .dark class on <html>).
+ */
+:root,
+.dark {
+  color-scheme: dark;
+
+  /* Brand */
+  --brand-black: #000000;
+  --brand-yellow: #eaca08;
+  --brand-yellow-hover: #f5d92e;   /* lighter, for hover on yellow */
+  --brand-yellow-muted: #2b2503;   /* yellow at ~15% on black: selected/hover fills */
+  --brand-yellow-soft: #f3e27a;    /* readable yellow text on dark fills */
+
+  /* Surfaces: black, then steps of neutral grey */
+  --background: #000000;
+  --foreground: #f5f5f5;
+  --card: #0f0f0f;
+  --card-foreground: #f5f5f5;
+  --popover: #141414;
+  --popover-foreground: #f5f5f5;
+
+  /* Actions */
+  --primary: var(--brand-yellow);
+  --primary-foreground: #000000;
+  --secondary: #1f1f1f;
+  --secondary-foreground: #f5f5f5;
+  --muted: #1a1a1a;
+  --muted-foreground: #a3a3a3;
+  --accent: var(--brand-yellow-muted);
+  --accent-foreground: var(--brand-yellow-soft);
+  --destructive: #f0554a;
+  --destructive-foreground: #000000;
+
+  /* Lines and focus */
+  --border: #2a2a2a;
+  --input: #3a3a3a;
+  --ring: var(--brand-yellow);
+
+  /* Status colours, tuned for black backgrounds */
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #60a5fa;
+
+  /* Charts: brand yellow first, then hues that stay distinct from it */
+  --chart-1: #eaca08;
+  --chart-2: #2dd4bf;
+  --chart-3: #a78bfa;
+  --chart-4: #fb7185;
+  --chart-5: #4ade80;
+
+  /* Sidebar */
+  --sidebar: #000000;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-primary: var(--brand-yellow);
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: var(--brand-yellow-muted);
+  --sidebar-accent-foreground: var(--brand-yellow-soft);
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: var(--brand-yellow);
+
   --font-sans: DM Sans, sans-serif;
   --font-serif: DM Sans, sans-serif;
   --font-mono: Space Mono, monospace;
@@ -88,70 +127,17 @@
   --shadow-blur: 0px;
   --shadow-spread: 0px;
   --shadow-opacity: 0.05;
-  --shadow-color: #1a1a1a;
-  --shadow-2xs: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.03);
-  --shadow-xs: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.03);
-  --shadow-sm: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.05), 0px 1px 2px -1px hsl(0 0% 10.1961% / 0.05);
-  --shadow: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.05), 0px 1px 2px -1px hsl(0 0% 10.1961% / 0.05);
-  --shadow-md: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.05), 0px 2px 4px -1px hsl(0 0% 10.1961% / 0.05);
-  --shadow-lg: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.05), 0px 4px 6px -1px hsl(0 0% 10.1961% / 0.05);
-  --shadow-xl: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.05), 0px 8px 10px -1px hsl(0 0% 10.1961% / 0.05);
-  --shadow-2xl: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.13);
+  --shadow-color: #000000;
+  --shadow-2xs: 0px 0px 0px 0px rgb(0 0 0 / 0.3);
+  --shadow-xs: 0px 0px 0px 0px rgb(0 0 0 / 0.3);
+  --shadow-sm: 0px 1px 2px -1px rgb(0 0 0 / 0.5);
+  --shadow: 0px 1px 2px -1px rgb(0 0 0 / 0.5);
+  --shadow-md: 0px 2px 4px -1px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0px 4px 6px -1px rgb(0 0 0 / 0.6);
+  --shadow-xl: 0px 8px 10px -1px rgb(0 0 0 / 0.6);
+  --shadow-2xl: 0px 0px 0px 0px rgb(0 0 0 / 0.7);
   --tracking-normal: normal;
   --spacing: 0.25rem;
-}
-
-.dark {
-  --background: oklch(0 0 0);
-  --foreground: oklch(1.0000 0 0);
-  --card: oklch(0.2455 0.0217 257.2823);
-  --card-foreground: oklch(1.0000 0 0);
-  --popover: oklch(0.2455 0.0217 257.2823);
-  --popover-foreground: oklch(1.0000 0 0);
-  --primary: oklch(0.6801 0.1583 276.9349);
-  --primary-foreground: oklch(0 0 0);
-  --secondary: oklch(0.7845 0.1325 181.9120);
-  --secondary-foreground: oklch(0 0 0);
-  --muted: oklch(0.3211 0 0);
-  --muted-foreground: oklch(0.8452 0 0);
-  --accent: oklch(0.8790 0.1534 91.6054);
-  --accent-foreground: oklch(0 0 0);
-  --destructive: oklch(0.7106 0.1661 22.2162);
-  --destructive-foreground: oklch(0 0 0);
-  --border: oklch(0.4459 0 0);
-  --input: oklch(1.0000 0 0);
-  --ring: oklch(0.6801 0.1583 276.9349);
-  --chart-1: oklch(0.6801 0.1583 276.9349);
-  --chart-2: oklch(0.7845 0.1325 181.9120);
-  --chart-3: oklch(0.8790 0.1534 91.6054);
-  --chart-4: oklch(0.7253 0.1752 349.7607);
-  --chart-5: oklch(0.8003 0.1821 151.7110);
-  --sidebar: oklch(0 0 0);
-  --sidebar-foreground: oklch(1.0000 0 0);
-  --sidebar-primary: oklch(0.6801 0.1583 276.9349);
-  --sidebar-primary-foreground: oklch(0 0 0);
-  --sidebar-accent: oklch(0.8790 0.1534 91.6054);
-  --sidebar-accent-foreground: oklch(0 0 0);
-  --sidebar-border: oklch(1.0000 0 0);
-  --sidebar-ring: oklch(0.6801 0.1583 276.9349);
-  --font-sans: DM Sans, sans-serif;
-  --font-serif: DM Sans, sans-serif;
-  --font-mono: Space Mono, monospace;
-  --radius: 1rem;
-  --shadow-x: 0px;
-  --shadow-y: 0px;
-  --shadow-blur: 0px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.05;
-  --shadow-color: #1a1a1a;
-  --shadow-2xs: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.03);
-  --shadow-xs: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.03);
-  --shadow-sm: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.05), 0px 1px 2px -1px hsl(0 0% 10.1961% / 0.05);
-  --shadow: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.05), 0px 1px 2px -1px hsl(0 0% 10.1961% / 0.05);
-  --shadow-md: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.05), 0px 2px 4px -1px hsl(0 0% 10.1961% / 0.05);
-  --shadow-lg: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.05), 0px 4px 6px -1px hsl(0 0% 10.1961% / 0.05);
-  --shadow-xl: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.05), 0px 8px 10px -1px hsl(0 0% 10.1961% / 0.05);
-  --shadow-2xl: 0px 0px 0px 0px hsl(0 0% 10.1961% / 0.13);
 }
 
 @theme inline {
@@ -188,6 +174,12 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-brand: var(--brand-yellow);
+
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
@@ -214,6 +206,54 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
+/* Borders default to the text colour, which on black means near-white lines
+   around every card and divider. Use the border token unless a class says
+   otherwise. */
+@layer base {
+  *,
+  ::before,
+  ::after,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--border);
+  }
+}
+
 body {
+  background-color: var(--background);
+  color: var(--foreground);
   letter-spacing: var(--tracking-normal);
+}
+
+::selection {
+  background-color: var(--brand-yellow);
+  color: #000000;
+}
+
+/* Charts (Recharts draws axes, grids and tooltips for a white page by default) */
+.recharts-cartesian-axis-tick-value,
+.recharts-label {
+  fill: var(--muted-foreground);
+}
+
+.recharts-cartesian-axis-line,
+.recharts-cartesian-axis-tick-line,
+.recharts-cartesian-grid line {
+  stroke: var(--border);
+}
+
+.recharts-default-tooltip {
+  background-color: var(--popover) !important;
+  border-color: var(--border) !important;
+  border-radius: calc(var(--radius) - 4px);
+  color: var(--popover-foreground);
+}
+
+.recharts-tooltip-label,
+.recharts-legend-item-text {
+  color: var(--foreground) !important;
+}
+
+.recharts-tooltip-cursor {
+  fill: var(--muted);
 }

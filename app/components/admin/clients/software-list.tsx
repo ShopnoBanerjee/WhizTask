@@ -99,7 +99,7 @@ export function SoftwareList({ software }: SoftwareListProps) {
                   <span>{sw.subscribers.length}</span>
                 </div>
                 {sw.subscribers.length > 0 && (
-                  <div className="flex justify-between text-green-600">
+                  <div className="flex justify-between text-green-400">
                     <span>Cost per Client</span>
                     <span>{formatCurrency(sw.value_per_month / sw.subscribers.length)}/mo</span>
                   </div>
